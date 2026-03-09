@@ -54,7 +54,7 @@ async def receive_webhook(request: Request):
                 value = change.get("value", {})
 
                 comment_text = value.get("text", "").strip().lower()
-                media_id = value.get("media_id")
+                media_id = value.get("media", {}).get("id")
                 comment_id = value.get("id")
                 user_id = value.get("from", {}).get("id")
 
@@ -90,7 +90,7 @@ async def receive_webhook(request: Request):
                         print(f"No rule found for media_id={media_id} catchphrase={comment_text}")
                         continue
 
-                    await send_dm(user_id, rule.dm_message)
+                    await send_dm(comment_id, rule.dm_message)
 
                     new_log = DMLog(
                         user_id=user_id,
