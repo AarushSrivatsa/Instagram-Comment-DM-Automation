@@ -3,6 +3,8 @@ from fastapi import FastAPI
 from routers.webhook import router as webhook_router
 from routers.crud import router as crud_router
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 app = FastAPI()
 
@@ -20,3 +22,9 @@ def privacy():
 
     <p>Users may request deletion of their data by contacting: your@email.com</p>
     """
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+@app.get("/")
+def frontend():
+    return FileResponse("static/index.html")
