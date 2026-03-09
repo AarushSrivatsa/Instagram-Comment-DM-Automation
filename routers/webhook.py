@@ -1,5 +1,6 @@
 import httpx
 from fastapi import APIRouter, Request, HTTPException
+from fastapi.responses import PlainTextResponse
 from sqlalchemy import select
 from database import AsyncSessionLocal, CommentDMRule, DMLog
 from dotenv import load_dotenv
@@ -14,7 +15,7 @@ router = APIRouter(
 
 VERIFY_TOKEN = os.getenv('VERIFY_TOKEN')
 PAGE_ACCESS_TOKEN = os.getenv('PAGE_ACCESS_TOKEN')
-GRAPH_API_VERSION = "v19.0"
+IG_USER_ID = os.getenv('IG_USER_ID')
 
 @router.get("/")
 async def verify_webhook(request: Request):
@@ -26,7 +27,7 @@ async def verify_webhook(request: Request):
     challenge = params.get("hub.challenge")
 
     if mode == "subscribe" and token == VERIFY_TOKEN:
-        return int(challenge)
+        return PlainTextResponse(content=challenge)
 
     raise HTTPException(403, "Verification failed")
 
@@ -35,9 +36,11 @@ async def receive_webhook(request: Request):
 
     data = await request.json()
 
+    print("Webhook payload:", data)
+
     try:
 
-        if data.get("object") != "instagram":
+        if data.get("object") not in ["instagram", "page"]:
             return {"status": "ignored"}
 
         entry = data.get("entry", [])
@@ -54,6 +57,8 @@ async def receive_webhook(request: Request):
                 media_id = value.get("media_id")
                 comment_id = value.get("id")
                 user_id = value.get("from", {}).get("id")
+
+                print(f"comment: {comment_text} | media: {media_id} | comment_id: {comment_id} | user: {user_id}")
 
                 if not all([comment_text, media_id, comment_id, user_id]):
                     continue
@@ -82,6 +87,7 @@ async def receive_webhook(request: Request):
                     rule = rule_result.scalar_one_or_none()
 
                     if not rule:
+                        print(f"No rule found for media_id={media_id} catchphrase={comment_text}")
                         continue
 
                     await send_dm(user_id, rule.dm_message)
@@ -102,12 +108,13 @@ async def receive_webhook(request: Request):
         print("Webhook error:", str(e))
 
         return {"status": "error"}
-async def send_dm(user_id: str, message: str):
 
-    url = "https://graph.instagram.com/v21.0/me/messages"
+async def send_dm(comment_id: str, message: str):
+
+    url = f"https://graph.instagram.com/v21.0/{IG_USER_ID}/messages"
 
     payload = {
-        "recipient": {"id": user_id},
+        "recipient": {"comment_id": comment_id},
         "message": {"text": message},
     }
 
@@ -120,6 +127,6 @@ async def send_dm(user_id: str, message: str):
         )
 
         if response.status_code != 200:
-            raise Exception(f"DM failed for user {user_id}: {response.text}")
+            raise Exception(f"DM failed for comment {comment_id}: {response.text}")
 
         print("DM sent:", response.text)
