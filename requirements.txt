@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+sqlalchemy
+python-dotenv
+uvicorn
+httpx
+asyncpg
+psycopg[binary]
+psycopg2
