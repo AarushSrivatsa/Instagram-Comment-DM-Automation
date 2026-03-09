@@ -27,10 +27,17 @@ class RuleUpdate(BaseModel):
     dm_message: str
 
 def extract_shortcode(url: str) -> str:
-    url = url.rstrip("/").split("?")[0]
-    return url.split("/")[-1]
+    url = url.split("?")[0]
+    url = url.rstrip("/")
+    parts = [p for p in url.split("/") if p]
+    return parts[-1] if parts else ""
 
 async def get_media_id(video_link: str) -> str:
+
+    print(f"Raw video_link received: '{video_link}'")
+
+    shortcode = extract_shortcode(video_link)
+    print(f"Extracted shortcode: '{shortcode}'")
 
     url = f"https://graph.instagram.com/v21.0/{IG_USER_ID}"
 
@@ -52,8 +59,9 @@ async def get_media_id(video_link: str) -> str:
             media_list = data.get("media", {}).get("data", [])
 
             for media in media_list:
-                print(f"Comparing: {extract_shortcode(media['permalink'])} == {extract_shortcode(video_link)}")
-                if extract_shortcode(media["permalink"]) == extract_shortcode(video_link):
+                api_shortcode = extract_shortcode(media["permalink"])
+                print(f"Comparing: {api_shortcode} == {shortcode}")
+                if api_shortcode == shortcode:
                     return media["id"]
 
             next_url = data.get("media", {}).get("paging", {}).get("next")
