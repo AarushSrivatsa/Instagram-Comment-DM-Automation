@@ -48,9 +48,11 @@ async def get_media_id(video_link: str) -> str:
             media_list = data.get("media", {}).get("data", [])
 
             for media in media_list:
-                if media["permalink"].rstrip("/") == video_link.rstrip("/"):
+                api_link = media["permalink"].rstrip("/").replace("www.", "").lower()
+                input_link = video_link.rstrip("/").replace("www.", "").lower()
+                print(f"Comparing: {api_link} == {input_link}")
+                if api_link == input_link:
                     return media["id"]
-
             next_url = data.get("media", {}).get("paging", {}).get("next")
             url = next_url
             params = {} 
