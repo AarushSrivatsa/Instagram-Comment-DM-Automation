@@ -27,8 +27,8 @@ class RuleUpdate(BaseModel):
     dm_message: str
 
 def extract_shortcode(url: str) -> str:
-    url = url.rstrip("/").split("?")[0] 
-    return url.split("/")[-1].lower()
+    url = url.rstrip("/").split("?")[0]
+    return url.split("/")[-1]
 
 async def get_media_id(video_link: str) -> str:
 
