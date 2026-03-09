@@ -26,6 +26,9 @@ class RuleUpdate(BaseModel):
     catchphrase: str
     dm_message: str
 
+def extract_shortcode(url: str) -> str:
+    return url.rstrip("/").split("/")[-1].lower()
+
 async def get_media_id(video_link: str) -> str:
 
     url = f"https://graph.instagram.com/v21.0/{IG_USER_ID}"
@@ -48,14 +51,13 @@ async def get_media_id(video_link: str) -> str:
             media_list = data.get("media", {}).get("data", [])
 
             for media in media_list:
-                api_link = media["permalink"].rstrip("/").replace("www.", "").lower()
-                input_link = video_link.rstrip("/").replace("www.", "").lower()
-                print(f"Comparing: {api_link} == {input_link}")
-                if api_link == input_link:
+                print(f"Comparing: {extract_shortcode(media['permalink'])} == {extract_shortcode(video_link)}")
+                if extract_shortcode(media["permalink"]) == extract_shortcode(video_link):
                     return media["id"]
+
             next_url = data.get("media", {}).get("paging", {}).get("next")
             url = next_url
-            params = {} 
+            params = {}
 
     raise HTTPException(404, "Video not found in your Instagram account")
 
