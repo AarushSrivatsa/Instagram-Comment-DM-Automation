@@ -541,10 +541,7 @@
       </div>
     </nav>
 
-    <div class="api-config">
-      <div class="api-label">API Base URL</div>
-      <input class="api-input" id="baseUrl" type="text" placeholder="https://your-app.onrender.com" />
-    </div>
+
   </aside>
 
   <main class="main">
@@ -656,7 +653,7 @@
 <div class="toast-container" id="toasts"></div>
 
 <script>
-  const getBase = () => document.getElementById('baseUrl').value.trim().replace(/\/$/, '') || '';
+  const getBase = () => window.location.origin;
 
   // nav
   document.querySelectorAll('.nav-item').forEach(item => {
