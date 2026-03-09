@@ -14,7 +14,6 @@ router = APIRouter(
 )
 
 PAGE_ACCESS_TOKEN = os.getenv("PAGE_ACCESS_TOKEN")
-GRAPH_API_VERSION = "v19.0"
 IG_USER_ID = os.getenv("IG_USER_ID")
 
 class RuleCreate(BaseModel):
@@ -29,7 +28,7 @@ class RuleUpdate(BaseModel):
 
 async def get_media_id(video_link: str) -> str:
 
-    url = f"https://graph.facebook.com/{GRAPH_API_VERSION}/{IG_USER_ID}"
+    url = f"https://graph.instagram.com/v21.0/{IG_USER_ID}"
 
     params = {
         "fields": "media.limit(100){id,permalink}",

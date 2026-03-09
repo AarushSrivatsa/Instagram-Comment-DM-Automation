@@ -102,25 +102,22 @@ async def receive_webhook(request: Request):
         print("Webhook error:", str(e))
 
         return {"status": "error"}
-
 async def send_dm(user_id: str, message: str):
 
-    url = f"https://graph.facebook.com/{GRAPH_API_VERSION}/me/messages"
+    url = "https://graph.instagram.com/v21.0/me/messages"
 
     payload = {
-        "recipient": {
-            "id": user_id
-        },
-        "message": {
-            "text": message
-        },
-        "messaging_type": "RESPONSE",
-        "access_token": PAGE_ACCESS_TOKEN
+        "recipient": {"id": user_id},
+        "message": {"text": message},
     }
 
     async with httpx.AsyncClient() as client:
 
-        response = await client.post(url, json=payload)
+        response = await client.post(
+            url,
+            json=payload,
+            headers={"Authorization": f"Bearer {PAGE_ACCESS_TOKEN}"}
+        )
 
         if response.status_code != 200:
             raise Exception(f"DM failed for user {user_id}: {response.text}")
