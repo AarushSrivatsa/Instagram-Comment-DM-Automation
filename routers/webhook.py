@@ -116,7 +116,7 @@ async def receive_webhook(request: Request):
 
 async def send_dm(comment_id: str, message: str):
 
-    url = f"https://graph.instagram.com/v21.0/{IG_USER_ID}/messages"
+    url = f"https://graph.facebook.com/v25.0/{IG_USER_ID}/messages"
 
     payload = {
         "recipient": {"comment_id": comment_id},
@@ -138,7 +138,7 @@ async def send_dm(comment_id: str, message: str):
 
 async def send_reply(comment_id: str, message: str):
 
-    url = f"https://graph.facebook.com/v21.0/{comment_id}/replies"
+    url = f"https://graph.facebook.com/v25.0/{comment_id}/replies"
 
     params = {
         "message": message,
