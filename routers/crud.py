@@ -53,7 +53,10 @@ async def get_media_id(video_link: str) -> str:
         while url:
 
             response = await client.get(url, params=params)
-            
+
+            if response.status_code != 200:
+                raise HTTPException(400, "Failed to fetch Instagram media")
+
             data = response.json()
             media_list = data.get("media", {}).get("data", [])
 
