@@ -120,14 +120,12 @@ async def send_dm(comment_id: str, message: str):
             headers={"Authorization": f"Bearer {PAGE_ACCESS_TOKEN}"}
         )
 
-        if response.status_code == 200:
-            print(f"✅ DM sent successfully to comment_id: {comment_id}")
-            return
-        else:
-            print(f"❌ DM failed | Status: {response.status_code}")
-            print(f"Response: {response.text}")
+        print(f"DM Response Status: {response.status_code}")
+        if response.status_code != 200:
+            print(f"DM Error Body: {response.text}")
             raise Exception(f"DM failed: {response.text}")
-
+        else:
+            print(f"✅ DM sent successfully for comment {comment_id}")
 
 # ====================== SEND COMMENT REPLY ======================
 async def send_reply(comment_id: str, message: str):
