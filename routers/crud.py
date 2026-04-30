@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from database import AsyncSessionLocal, CommentDMRule
 from dotenv import load_dotenv
+from typing import Optional
 import os
 
 load_dotenv()
@@ -20,11 +21,12 @@ class RuleCreate(BaseModel):
     video_link: str
     catchphrase: str
     dm_message: str
-
+    reply_message: Optional[str] = None
 
 class RuleUpdate(BaseModel):
     catchphrase: str
     dm_message: str
+    reply_message: Optional[str] = None
 
 def extract_shortcode(url: str) -> str:
     url = url.split("?")[0]
@@ -81,7 +83,8 @@ async def create_rule(rule: RuleCreate):
         new_rule = CommentDMRule(
             media_id=media_id,
             catchphrase=rule.catchphrase.lower(),
-            dm_message=rule.dm_message
+            dm_message=rule.dm_message,
+            reply_message=rule.reply_message or None,
         )
 
         db.add(new_rule)
@@ -92,7 +95,8 @@ async def create_rule(rule: RuleCreate):
             "id": new_rule.id,
             "video_link": rule.video_link,
             "catchphrase": new_rule.catchphrase,
-            "dm_message": new_rule.dm_message
+            "dm_message": new_rule.dm_message,
+            "reply_message": new_rule.reply_message,
         }
 
 @router.get("/")
@@ -109,7 +113,8 @@ async def get_all_rules():
                 "id": r.id,
                 "media_id": r.media_id,
                 "catchphrase": r.catchphrase,
-                "dm_message": r.dm_message
+                "dm_message": r.dm_message,
+                "reply_message": r.reply_message,
             }
             for r in rules
         ]
@@ -136,7 +141,8 @@ async def get_rules_by_video(
                 "id": r.id,
                 "video_link": video_link,
                 "catchphrase": r.catchphrase,
-                "dm_message": r.dm_message
+                "dm_message": r.dm_message,
+                "reply_message": r.reply_message,
             }
             for r in rules
         ]
@@ -159,6 +165,7 @@ async def update_rule(rule_id: int, rule: RuleUpdate):
 
         existing.catchphrase = rule.catchphrase.lower()
         existing.dm_message = rule.dm_message
+        existing.reply_message = rule.reply_message or None
 
         await db.commit()
         await db.refresh(existing)
@@ -167,7 +174,8 @@ async def update_rule(rule_id: int, rule: RuleUpdate):
             "id": existing.id,
             "media_id": existing.media_id,
             "catchphrase": existing.catchphrase,
-            "dm_message": existing.dm_message
+            "dm_message": existing.dm_message,
+            "reply_message": existing.reply_message,
         }
 
 @router.delete("/{rule_id}")

@@ -90,7 +90,12 @@ async def receive_webhook(request: Request):
                         print(f"No rule found for media_id={media_id} catchphrase={comment_text}")
                         continue
 
+                    # Send DM
                     await send_dm(comment_id, rule.dm_message)
+
+                    # Send comment reply if configured
+                    if rule.reply_message:
+                        await send_reply(comment_id, rule.reply_message)
 
                     new_log = DMLog(
                         user_id=user_id,
@@ -130,3 +135,21 @@ async def send_dm(comment_id: str, message: str):
             raise Exception(f"DM failed for comment {comment_id}: {response.text}")
 
         print("DM sent:", response.text)
+
+async def send_reply(comment_id: str, message: str):
+
+    url = f"https://graph.facebook.com/v21.0/{comment_id}/replies"
+
+    params = {
+        "message": message,
+        "access_token": PAGE_ACCESS_TOKEN,
+    }
+
+    async with httpx.AsyncClient() as client:
+
+        response = await client.post(url, params=params)
+
+        if response.status_code != 200:
+            raise Exception(f"Comment reply failed for comment {comment_id}: {response.text}")
+
+        print("Comment reply sent:", response.text)

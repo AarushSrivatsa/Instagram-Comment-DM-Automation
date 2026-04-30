@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy import String, Text, Boolean, Integer, DateTime, func
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Optional
 import os
 from dotenv import load_dotenv
 import asyncio
@@ -56,6 +56,12 @@ class CommentDMRule(Base):
     dm_message: Mapped[str] = mapped_column(
         Text,
         nullable=False,
+    )
+
+    reply_message: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        default=None,
     )
 
     is_active: Mapped[bool] = mapped_column(

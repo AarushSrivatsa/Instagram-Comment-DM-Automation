@@ -334,6 +334,25 @@
     font-family: var(--mono);
   }
 
+  .rule-reply {
+    color: var(--accent2);
+    font-size: 12px;
+    opacity: 0.8;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 500px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .rule-reply::before {
+    content: '↩';
+    font-size: 11px;
+    opacity: 0.7;
+  }
+
   .rule-actions { display: flex; gap: 8px; align-items: center; }
 
   /* toast */
@@ -615,6 +634,10 @@
             <label>DM Message</label>
             <textarea id="create-dm-message" rows="4" placeholder="The message to send when someone comments the catchphrase..."></textarea>
           </div>
+          <div class="field">
+            <label>Comment Reply <span style="color:var(--muted);font-size:10px;text-transform:none;letter-spacing:0">(optional — e.g. "check your DMs!")</span></label>
+            <textarea id="create-reply-message" rows="2" placeholder="Leave blank to skip public reply..."></textarea>
+          </div>
           <div>
             <button class="btn btn-primary" id="create-btn" onclick="createRule()">
               <span>create rule</span>
@@ -640,6 +663,10 @@
       <div class="field">
         <label>DM Message</label>
         <textarea id="edit-dm-message" rows="4"></textarea>
+      </div>
+      <div class="field">
+        <label>Comment Reply <span style="color:var(--muted);font-size:10px;text-transform:none;letter-spacing:0">(optional)</span></label>
+        <textarea id="edit-reply-message" rows="2" placeholder="Leave blank to skip public reply..."></textarea>
       </div>
     </div>
     <div class="modal-actions">
@@ -717,11 +744,12 @@
       <div class="rule-card">
         <div class="rule-meta">
           <div class="rule-catchphrase">${escHtml(r.catchphrase)}</div>
-          <div class="rule-message">${escHtml(r.dm_message)}</div>
+          <div class="rule-message">✉ ${escHtml(r.dm_message)}</div>
+          ${r.reply_message ? `<div class="rule-reply">${escHtml(r.reply_message)}</div>` : ''}
           <div class="rule-id">media_id: ${escHtml(r.media_id)} &nbsp;·&nbsp; id: ${r.id}</div>
         </div>
         <div class="rule-actions">
-          <button class="btn btn-ghost" style="font-size:11px;padding:6px 12px" onclick="openEdit(${r.id}, '${escAttr(r.catchphrase)}', '${escAttr(r.dm_message)}')">edit</button>
+          <button class="btn btn-ghost" style="font-size:11px;padding:6px 12px" onclick="openEdit(${r.id}, '${escAttr(r.catchphrase)}', '${escAttr(r.dm_message)}', '${escAttr(r.reply_message || '')}')">edit</button>
           <button class="btn btn-danger" onclick="deleteRule(${r.id})">delete</button>
         </div>
       </div>
@@ -777,8 +805,9 @@
     const videoLink = document.getElementById('create-video-link').value.trim();
     const catchphrase = document.getElementById('create-catchphrase').value.trim();
     const dmMessage = document.getElementById('create-dm-message').value.trim();
+    const replyMessage = document.getElementById('create-reply-message').value.trim();
 
-    if (!videoLink || !catchphrase || !dmMessage) { toast('All fields required', 'error'); return; }
+    if (!videoLink || !catchphrase || !dmMessage) { toast('Video link, catchphrase and DM message are required', 'error'); return; }
 
     btn.disabled = true;
     btn.querySelector('span').textContent = 'creating...';
@@ -786,12 +815,13 @@
     try {
       await api('/crud/', {
         method: 'POST',
-        body: JSON.stringify({ video_link: videoLink, catchphrase, dm_message: dmMessage })
+        body: JSON.stringify({ video_link: videoLink, catchphrase, dm_message: dmMessage, reply_message: replyMessage || null })
       });
       toast('Rule created successfully');
       document.getElementById('create-video-link').value = '';
       document.getElementById('create-catchphrase').value = '';
       document.getElementById('create-dm-message').value = '';
+      document.getElementById('create-reply-message').value = '';
     } catch(e) {
       toast(e.message, 'error');
     } finally {
@@ -813,10 +843,11 @@
   }
 
   // edit modal
-  function openEdit(id, catchphrase, dmMessage) {
+  function openEdit(id, catchphrase, dmMessage, replyMessage) {
     document.getElementById('edit-rule-id').value = id;
     document.getElementById('edit-catchphrase').value = catchphrase;
     document.getElementById('edit-dm-message').value = dmMessage;
+    document.getElementById('edit-reply-message').value = replyMessage || '';
     document.getElementById('edit-modal').classList.add('open');
   }
 
@@ -832,11 +863,12 @@
     const id = document.getElementById('edit-rule-id').value;
     const catchphrase = document.getElementById('edit-catchphrase').value.trim();
     const dmMessage = document.getElementById('edit-dm-message').value.trim();
-    if (!catchphrase || !dmMessage) { toast('Fields cannot be empty', 'error'); return; }
+    const replyMessage = document.getElementById('edit-reply-message').value.trim();
+    if (!catchphrase || !dmMessage) { toast('Catchphrase and DM message cannot be empty', 'error'); return; }
     try {
       await api(`/crud/${id}`, {
         method: 'PUT',
-        body: JSON.stringify({ catchphrase, dm_message: dmMessage })
+        body: JSON.stringify({ catchphrase, dm_message: dmMessage, reply_message: replyMessage || null })
       });
       toast('Rule updated');
       closeModal();
