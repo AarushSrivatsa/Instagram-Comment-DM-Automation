@@ -6,3 +6,4 @@ uvicorn
 httpx
 asyncpg
 psycopg[binary]
+psycopg2-binary
