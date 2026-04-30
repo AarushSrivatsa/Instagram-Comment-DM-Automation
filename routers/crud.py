@@ -38,7 +38,7 @@ async def get_media_id(video_link: str) -> str:
     shortcode = extract_shortcode(video_link)
     print(f"Looking for shortcode: '{shortcode}'")
 
-    url = f"https://graph.instagram.com/v21.0/{IG_USER_ID}/media"
+    url = f"https://graph.instagram.com/v25.0/{IG_USER_ID}/media"
     params = {
         "fields": "id,permalink",
         "limit": 100,
