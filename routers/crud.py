@@ -35,43 +35,35 @@ def extract_shortcode(url: str) -> str:
     return parts[-1] if parts else ""
 
 async def get_media_id(video_link: str) -> str:
-
-    print(f"Raw video_link received: '{video_link}'")
-
     shortcode = extract_shortcode(video_link)
-    print(f"Extracted shortcode: '{shortcode}'")
+    print(f"Looking for shortcode: '{shortcode}'")
 
-    url = f"https://graph.instagram.com/v21.0/{IG_USER_ID}"
-
+    url = f"https://graph.instagram.com/v21.0/{IG_USER_ID}/media"
     params = {
-        "fields": "media.limit(100){id,permalink}",
+        "fields": "id,permalink",
+        "limit": 100,
         "access_token": PAGE_ACCESS_TOKEN,
     }
 
     async with httpx.AsyncClient() as client:
-
         while url:
-
             response = await client.get(url, params=params)
 
             if response.status_code != 200:
-                raise HTTPException(400, "Failed to fetch Instagram media")
+                raise HTTPException(400, f"Instagram API error: {response.text}")
 
             data = response.json()
-            media_list = data.get("media", {}).get("data", [])
 
-            for media in media_list:
+            for media in data.get("data", []):
                 api_shortcode = extract_shortcode(media["permalink"])
-                print(f"Comparing: {api_shortcode} == {shortcode}")
+                print(f"Comparing: '{api_shortcode}' == '{shortcode}'")
                 if api_shortcode == shortcode:
                     return media["id"]
 
-            next_url = data.get("media", {}).get("paging", {}).get("next")
-            url = next_url
+            url = data.get("paging", {}).get("next")
             params = {}
 
     raise HTTPException(404, "Video not found in your Instagram account")
-
 
 @router.post("/")
 async def create_rule(rule: RuleCreate):
