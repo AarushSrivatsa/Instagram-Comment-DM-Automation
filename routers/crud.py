@@ -50,6 +50,7 @@ async def get_media_id(video_link: str) -> str:
             response = await client.get(url, params=params)
 
             if response.status_code != 200:
+                print(f"Instagram API error {response.status_code}: {response.text}")
                 raise HTTPException(400, f"Instagram API error: {response.text}")
 
             data = response.json()
