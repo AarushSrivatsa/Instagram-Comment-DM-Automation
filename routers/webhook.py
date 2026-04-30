@@ -8,20 +8,20 @@ import os
 
 load_dotenv()
 
-router = APIRouter(
-    prefix="/webhook",
-    tags=["Webhook"]
-)
+router = APIRouter(prefix="/webhook", tags=["Webhook"])
 
 VERIFY_TOKEN = os.getenv('VERIFY_TOKEN')
 PAGE_ACCESS_TOKEN = os.getenv('PAGE_ACCESS_TOKEN')
 IG_USER_ID = os.getenv('IG_USER_ID')
 
+# Basic validation
+if not all([VERIFY_TOKEN, PAGE_ACCESS_TOKEN, IG_USER_ID]):
+    raise RuntimeError("Missing required environment variables: VERIFY_TOKEN, PAGE_ACCESS_TOKEN, or IG_USER_ID")
+
+
 @router.get("/")
 async def verify_webhook(request: Request):
-
     params = dict(request.query_params)
-
     mode = params.get("hub.mode")
     token = params.get("hub.verify_token")
     challenge = params.get("hub.challenge")
@@ -31,25 +31,20 @@ async def verify_webhook(request: Request):
 
     raise HTTPException(403, "Verification failed")
 
+
 @router.post("/")
 async def receive_webhook(request: Request):
-
     data = await request.json()
-
-    print("Webhook payload:", data)
+    print("Webhook payload received:", data)
 
     try:
-
         if data.get("object") not in ["instagram", "page"]:
             return {"status": "ignored"}
 
-        entry = data.get("entry", [])
-
-        for entry_item in entry:
-
-            changes = entry_item.get("changes", [])
-
-            for change in changes:
+        for entry_item in data.get("entry", []):
+            for change in entry_item.get("changes", []):
+                if change.get("field") != "comments":
+                    continue
 
                 value = change.get("value", {})
 
@@ -58,24 +53,21 @@ async def receive_webhook(request: Request):
                 comment_id = value.get("id")
                 user_id = value.get("from", {}).get("id")
 
-                print(f"comment: {comment_text} | media: {media_id} | comment_id: {comment_id} | user: {user_id}")
+                print(f"Comment received: '{comment_text}' | Media: {media_id} | Comment ID: {comment_id}")
 
                 if not all([comment_text, media_id, comment_id, user_id]):
                     continue
 
                 async with AsyncSessionLocal() as db:
-
-                    log_check = await db.execute(
-                        select(DMLog).where(
-                            DMLog.comment_id == comment_id
-                        )
+                    # Prevent sending DM multiple times for same comment
+                    existing_log = await db.execute(
+                        select(DMLog).where(DMLog.comment_id == comment_id)
                     )
-
-                    existing_log = log_check.scalar_one_or_none()
-
-                    if existing_log:
+                    if existing_log.scalar_one_or_none():
+                        print("Duplicate comment skipped")
                         continue
 
+                    # Find matching rule
                     rule_result = await db.execute(
                         select(CommentDMRule).where(
                             CommentDMRule.media_id == media_id,
@@ -83,73 +75,77 @@ async def receive_webhook(request: Request):
                             CommentDMRule.is_active == True
                         )
                     )
-
                     rule = rule_result.scalar_one_or_none()
 
                     if not rule:
-                        print(f"No rule found for media_id={media_id} catchphrase={comment_text}")
+                        print(f"No active rule found for media_id={media_id}, catchphrase='{comment_text}'")
                         continue
 
-                    # Send DM
+                    # Send DM using graph.instagram.com
                     await send_dm(comment_id, rule.dm_message)
 
-                    # Send comment reply if configured
+                    # Send public reply if configured
                     if rule.reply_message:
                         await send_reply(comment_id, rule.reply_message)
 
+                    # Log the action
                     new_log = DMLog(
                         user_id=user_id,
                         media_id=media_id,
                         comment_id=comment_id
                     )
-
                     db.add(new_log)
                     await db.commit()
 
         return {"status": "ok"}
 
     except Exception as e:
-
-        print("Webhook error:", str(e))
-
+        print(f"Webhook error: {str(e)}")
         return {"status": "error"}
 
-async def send_dm(comment_id: str, message: str):
 
-    url = f"https://graph.facebook.com/v25.0/{IG_USER_ID}/messages"
+# ====================== SEND DM (Using graph.instagram.com) ======================
+async def send_dm(comment_id: str, message: str):
+    url = f"https://graph.instagram.com/v25.0/{IG_USER_ID}/messages"
 
     payload = {
         "recipient": {"comment_id": comment_id},
-        "message": {"text": message},
+        "message": {"text": message}
     }
 
-    async with httpx.AsyncClient() as client:
-
+    async with httpx.AsyncClient(timeout=15.0) as client:
         response = await client.post(
             url,
             json=payload,
             headers={"Authorization": f"Bearer {PAGE_ACCESS_TOKEN}"}
         )
 
-        if response.status_code != 200:
-            raise Exception(f"DM failed for comment {comment_id}: {response.text}")
+        if response.status_code == 200:
+            print(f"✅ DM sent successfully to comment_id: {comment_id}")
+            return
+        else:
+            print(f"❌ DM failed | Status: {response.status_code}")
+            print(f"Response: {response.text}")
+            raise Exception(f"DM failed: {response.text}")
 
-        print("DM sent:", response.text)
 
+# ====================== SEND COMMENT REPLY ======================
 async def send_reply(comment_id: str, message: str):
-
-    url = f"https://graph.facebook.com/v25.0/{comment_id}/replies"
+    url = f"https://graph.instagram.com/v25.0/{comment_id}/replies"
 
     params = {
         "message": message,
-        "access_token": PAGE_ACCESS_TOKEN,
+        "access_token": PAGE_ACCESS_TOKEN
     }
 
-    async with httpx.AsyncClient() as client:
-
+    async with httpx.AsyncClient(timeout=15.0) as client:
         response = await client.post(url, params=params)
 
-        if response.status_code != 200:
-            raise Exception(f"Comment reply failed for comment {comment_id}: {response.text}")
+        if response.status_code == 200:
+            print(f"✅ Public reply sent under comment {comment_id}")
+        else:
+            print(f"⚠️ Reply failed | Status: {response.status_code}")
+            print(f"Response: {response.text}")
+            # We don't raise here so DM can still succeed even if reply fails
 
-        print("Comment reply sent:", response.text)
+    
