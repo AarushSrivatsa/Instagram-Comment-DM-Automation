@@ -3,624 +3,590 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>inbot — comment automation</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<title>inbot</title>
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@300;400;500&family=Bricolage+Grotesque:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-  :root {
-    --bg: #0a0a0a;
-    --surface: #111111;
-    --surface2: #1a1a1a;
-    --border: #222222;
-    --accent: #e8ff47;
-    --accent2: #ff6b35;
-    --text: #f0f0f0;
-    --muted: #555555;
-    --muted2: #333333;
-    --success: #4fffb0;
-    --error: #ff4f6b;
-    --mono: 'DM Mono', monospace;
-    --display: 'Syne', sans-serif;
-  }
-
-  html { scroll-behavior: smooth; }
-
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--mono);
-    font-size: 13px;
-    line-height: 1.6;
-    min-height: 100vh;
-    overflow-x: hidden;
-  }
-
-  /* noise overlay */
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
-    pointer-events: none;
-    z-index: 9999;
-    opacity: 0.4;
-  }
-
-  /* layout */
-  .shell {
-    display: grid;
-    grid-template-columns: 220px 1fr;
-    min-height: 100vh;
-  }
-
-  /* sidebar */
-  .sidebar {
-    background: var(--surface);
-    border-right: 1px solid var(--border);
-    padding: 28px 0;
-    position: sticky;
-    top: 0;
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-
-  .logo {
-    font-family: var(--display);
-    font-weight: 800;
-    font-size: 22px;
-    letter-spacing: -0.5px;
-    padding: 0 24px 28px;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-
-  .logo-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--accent);
-    box-shadow: 0 0 12px var(--accent);
-    animation: pulse 2s ease-in-out infinite;
-  }
-
-  @keyframes pulse {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.5; transform: scale(0.8); }
-  }
-
-  .nav {
-    padding: 20px 0;
-    flex: 1;
-  }
-
-  .nav-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 24px;
-    cursor: pointer;
-    color: var(--muted);
-    font-size: 12px;
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
-    transition: all 0.15s;
-    border-left: 2px solid transparent;
-    user-select: none;
-  }
-
-  .nav-item:hover { color: var(--text); background: var(--surface2); }
-  .nav-item.active { color: var(--accent); border-left-color: var(--accent); background: rgba(232,255,71,0.04); }
-
-  .nav-icon { font-size: 14px; width: 18px; text-align: center; }
-
-  .api-config {
-    padding: 16px 24px;
-    border-top: 1px solid var(--border);
-  }
-
-  .api-label {
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: var(--muted);
-    margin-bottom: 8px;
-  }
-
-  .api-input {
-    width: 100%;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    color: var(--text);
-    font-family: var(--mono);
-    font-size: 11px;
-    padding: 7px 10px;
-    border-radius: 4px;
-    outline: none;
-    transition: border-color 0.15s;
-  }
-
-  .api-input:focus { border-color: var(--accent); }
-  .api-input::placeholder { color: var(--muted); }
-
-  /* main */
-  .main {
-    padding: 40px 48px;
-    max-width: 900px;
-  }
-
-  .page { display: none; animation: fadeIn 0.2s ease; }
-  .page.active { display: block; }
-
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(6px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  .page-header {
-    margin-bottom: 36px;
-  }
-
-  .page-title {
-    font-family: var(--display);
-    font-size: 32px;
-    font-weight: 700;
-    letter-spacing: -1px;
-    line-height: 1;
-    margin-bottom: 8px;
-  }
-
-  .page-title span { color: var(--accent); }
-
-  .page-sub {
-    color: var(--muted);
-    font-size: 12px;
-  }
-
-  /* cards */
-  .card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 24px;
-    margin-bottom: 16px;
-    transition: border-color 0.2s;
-  }
-
-  .card:hover { border-color: var(--muted2); }
-
-  .card-title {
-    font-family: var(--display);
-    font-size: 14px;
-    font-weight: 600;
-    margin-bottom: 18px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .card-title::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: var(--border);
-  }
-
-  /* form */
-  .form-grid {
-    display: grid;
-    gap: 14px;
-  }
-
-  .field { display: flex; flex-direction: column; gap: 6px; }
-
-  .field label {
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: var(--muted);
-  }
-
-  .field input, .field textarea {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    color: var(--text);
-    font-family: var(--mono);
-    font-size: 13px;
-    padding: 10px 14px;
-    border-radius: 4px;
-    outline: none;
-    transition: border-color 0.15s;
-    resize: vertical;
-  }
-
-  .field input:focus, .field textarea:focus { border-color: var(--accent); }
-  .field input::placeholder, .field textarea::placeholder { color: var(--muted); }
-
-  /* buttons */
-  .btn {
-    font-family: var(--mono);
-    font-size: 12px;
-    letter-spacing: 0.5px;
-    padding: 10px 20px;
-    border-radius: 4px;
-    border: none;
-    cursor: pointer;
-    transition: all 0.15s;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .btn-primary {
-    background: var(--accent);
-    color: #000;
-    font-weight: 500;
-  }
-
-  .btn-primary:hover { background: #d4eb00; transform: translateY(-1px); }
-  .btn-primary:active { transform: translateY(0); }
-
-  .btn-danger {
-    background: transparent;
-    color: var(--error);
-    border: 1px solid var(--error);
-    padding: 6px 12px;
-    font-size: 11px;
-  }
-
-  .btn-danger:hover { background: rgba(255,79,107,0.1); }
-
-  .btn-ghost {
-    background: transparent;
-    color: var(--muted);
-    border: 1px solid var(--border);
-  }
-
-  .btn-ghost:hover { color: var(--text); border-color: var(--muted2); }
-
-  .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; }
-
-  /* rules list */
-  .rules-list { display: flex; flex-direction: column; gap: 10px; }
-
-  .rule-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 16px 20px;
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 12px;
-    align-items: start;
-    transition: border-color 0.15s;
-    animation: slideIn 0.2s ease;
-  }
-
-  @keyframes slideIn {
-    from { opacity: 0; transform: translateX(-8px); }
-    to { opacity: 1; transform: translateX(0); }
-  }
-
-  .rule-card:hover { border-color: var(--muted2); }
-
-  .rule-meta { display: flex; flex-direction: column; gap: 6px; }
-
-  .rule-catchphrase {
-    font-family: var(--display);
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--accent);
-    letter-spacing: -0.3px;
-  }
-
-  .rule-message {
-    color: var(--text);
-    font-size: 12px;
-    opacity: 0.7;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 500px;
-  }
-
-  .rule-id {
-    font-size: 10px;
-    color: var(--muted);
-    font-family: var(--mono);
-  }
-
-  .rule-reply {
-    color: var(--accent2);
-    font-size: 12px;
-    opacity: 0.8;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 500px;
-    display: flex;
-    align-items: center;
-    gap: 5px;
-  }
-
-  .rule-reply::before {
-    content: '↩';
-    font-size: 11px;
-    opacity: 0.7;
-  }
-
-  .rule-actions { display: flex; gap: 8px; align-items: center; }
-
-  /* toast */
-  .toast-container {
-    position: fixed;
-    bottom: 24px;
-    right: 24px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    z-index: 1000;
-  }
-
-  .toast {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 12px 16px;
-    font-size: 12px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    min-width: 260px;
-    animation: toastIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-  }
-
-  @keyframes toastIn {
-    from { opacity: 0; transform: translateX(20px) scale(0.95); }
-    to { opacity: 1; transform: translateX(0) scale(1); }
-  }
-
-  .toast.success { border-left: 3px solid var(--success); }
-  .toast.error { border-left: 3px solid var(--error); }
-  .toast-icon { font-size: 14px; }
-
-  /* stats */
-  .stats-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
-    margin-bottom: 24px;
-  }
-
-  .stat-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 20px;
-  }
-
-  .stat-value {
-    font-family: var(--display);
-    font-size: 36px;
-    font-weight: 800;
-    letter-spacing: -2px;
-    color: var(--accent);
-    line-height: 1;
-    margin-bottom: 4px;
-  }
-
-  .stat-label {
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: var(--muted);
-  }
-
-  /* empty state */
-  .empty {
-    text-align: center;
-    padding: 60px 20px;
-    color: var(--muted);
-  }
-
-  .empty-icon { font-size: 32px; margin-bottom: 12px; opacity: 0.4; }
-  .empty-text { font-size: 12px; }
-
-  /* loading */
-  .loading {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    color: var(--muted);
-    font-size: 12px;
-    padding: 20px 0;
-  }
-
-  .spinner {
-    width: 14px;
-    height: 14px;
-    border: 2px solid var(--border);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: spin 0.6s linear infinite;
-  }
-
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  /* tag */
-  .tag {
-    display: inline-flex;
-    align-items: center;
-    background: rgba(232,255,71,0.08);
-    color: var(--accent);
-    border: 1px solid rgba(232,255,71,0.2);
-    border-radius: 3px;
-    padding: 2px 8px;
-    font-size: 10px;
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
-  }
-
-  /* edit modal */
-  .modal-overlay {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.7);
-    backdrop-filter: blur(4px);
-    z-index: 100;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .modal-overlay.open { display: flex; }
-
-  .modal {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 28px;
-    width: 420px;
-    animation: modalIn 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
-  }
-
-  @keyframes modalIn {
-    from { opacity: 0; transform: scale(0.95); }
-    to { opacity: 1; transform: scale(1); }
-  }
-
-  .modal-title {
-    font-family: var(--display);
-    font-size: 18px;
-    font-weight: 700;
-    margin-bottom: 20px;
-    letter-spacing: -0.5px;
-  }
-
-  .modal-actions {
-    display: flex;
-    gap: 10px;
-    margin-top: 20px;
-    justify-content: flex-end;
-  }
-
-  /* filter bar */
-  .filter-bar {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 20px;
-    align-items: center;
-  }
-
-  .filter-bar input {
-    flex: 1;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    color: var(--text);
-    font-family: var(--mono);
-    font-size: 12px;
-    padding: 9px 14px;
-    border-radius: 4px;
-    outline: none;
-    transition: border-color 0.15s;
-  }
-
-  .filter-bar input:focus { border-color: var(--accent); }
-  .filter-bar input::placeholder { color: var(--muted); }
-
-  /* scrollbar */
-  ::-webkit-scrollbar { width: 4px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--muted2); border-radius: 2px; }
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root {
+  --bg:      #0a0a0a;
+  --s1:      #111111;
+  --s2:      #181818;
+  --s3:      #222222;
+  --border:  rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.13);
+  --ig1: #833ab4;
+  --ig2: #c13584;
+  --ig3: #e1306c;
+  --ig4: #fd1d1d;
+  --ig5: #f77737;
+  --grad: linear-gradient(135deg, #833ab4, #e1306c, #f77737);
+  --grad2: linear-gradient(135deg, #833ab4 0%, #c13584 50%, #f77737 100%);
+  --p-soft: rgba(193,53,132,0.1);
+  --p-glow: rgba(193,53,132,0.22);
+  --text:  #f2f2f2;
+  --t2:    #888888;
+  --t3:    #3a3a3a;
+  --success: #4dd9ac;
+  --error:   #ff5c5c;
+  --mono:    'Geist Mono', monospace;
+  --display: 'Bricolage Grotesque', sans-serif;
+  --r:  12px;
+  --r2: 8px;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--display);
+  font-size: 14px;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(193,53,132,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(193,53,132,0.025) 1px, transparent 1px);
+  background-size: 44px 44px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  top: -180px; left: -120px;
+  width: 560px; height: 560px;
+  background: radial-gradient(circle, rgba(131,58,180,0.1) 0%, transparent 65%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  min-height: 100vh;
+  position: relative;
+  z-index: 1;
+}
+
+/* ── SIDEBAR ────────────────── */
+.sidebar {
+  background: var(--s1);
+  border-right: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.logo-wrap {
+  padding: 24px 20px 22px;
+  border-bottom: 1px solid var(--border);
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  font-family: var(--mono);
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--text);
+  letter-spacing: -0.3px;
+}
+
+.logo svg {
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 8px rgba(193,53,132,0.5));
+}
+
+.nav {
+  flex: 1;
+  padding: 14px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--r2);
+  cursor: pointer;
+  color: var(--t2);
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.15s;
+  user-select: none;
+}
+
+.nav-item:hover { color: var(--text); background: var(--s2); }
+.nav-item.active { color: var(--text); background: var(--p-soft); }
+
+.nav-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--t3);
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.nav-item.active .nav-dot { background: var(--ig3); box-shadow: 0 0 7px var(--ig3); }
+.nav-item:hover .nav-dot { background: var(--t2); }
+
+/* ── MAIN ───────────────────── */
+.main {
+  padding: 44px 52px 72px;
+  max-width: 880px;
+}
+
+.page { display: none; }
+.page.active { display: block; animation: up 0.2s ease; }
+
+@keyframes up {
+  from { opacity:0; transform:translateY(8px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+
+.page-header { margin-bottom: 36px; }
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--p-soft);
+  border: 1px solid rgba(193,53,132,0.2);
+  color: #e87ab0;
+  border-radius: 100px;
+  padding: 3px 12px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+
+.pip {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--ig3);
+  box-shadow: 0 0 5px var(--ig3);
+  animation: pip 2.5s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+@keyframes pip { 0%,100%{opacity:1} 50%{opacity:0.25} }
+
+.page-title {
+  font-size: 36px;
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -1.5px;
+  color: var(--text);
+}
+
+.page-title .hl {
+  background: var(--grad);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── STATS ──────────────────── */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3,1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.stat {
+  background: var(--s1);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 20px 22px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+
+.stat:hover { border-color: var(--border2); }
+
+.stat::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: var(--grad);
+  opacity: 0.6;
+}
+
+.stat-num {
+  font-size: 40px;
+  font-weight: 800;
+  letter-spacing: -2px;
+  line-height: 1;
+  margin-bottom: 6px;
+  background: linear-gradient(135deg, #fff 30%, rgba(255,255,255,0.55));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.stat-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--t2);
+}
+
+/* ── CARD ───────────────────── */
+.card {
+  background: var(--s1);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 24px;
+  margin-bottom: 16px;
+}
+
+.card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--t2);
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  font-family: var(--mono);
+}
+
+.card-head-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--ig3);
+  box-shadow: 0 0 6px var(--ig3);
+}
+
+/* ── FORM ───────────────────── */
+.form-grid { display: flex; flex-direction: column; gap: 16px; }
+.field { display: flex; flex-direction: column; gap: 7px; }
+
+.field label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--t2);
+}
+
+.field input,
+.field textarea {
+  background: var(--s2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+  padding: 11px 14px;
+  border-radius: var(--r2);
+  outline: none;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+  resize: vertical;
+}
+
+.field input:focus,
+.field textarea:focus {
+  border-color: var(--ig2);
+  background: var(--s3);
+  box-shadow: 0 0 0 3px rgba(193,53,132,0.1);
+}
+
+.field input::placeholder,
+.field textarea::placeholder { color: var(--t3); }
+
+.field-hint {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--t3);
+}
+
+/* ── BUTTONS ────────────────── */
+.btn {
+  font-family: var(--display);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 20px;
+  border-radius: var(--r2);
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.btn-primary { background: var(--grad2); color: #fff; }
+.btn-primary:hover { opacity: 0.88; transform: translateY(-1px); box-shadow: 0 4px 18px var(--p-glow); }
+.btn-primary:active { transform: translateY(0); box-shadow: none; opacity: 1; }
+
+.btn-ghost { background: transparent; color: var(--t2); border: 1px solid var(--border2); }
+.btn-ghost:hover { color: var(--text); background: var(--s2); }
+
+.btn-danger { background: transparent; color: var(--error); border: 1px solid rgba(255,92,92,0.2); font-size: 12px; padding: 7px 13px; }
+.btn-danger:hover { background: rgba(255,92,92,0.08); border-color: rgba(255,92,92,0.4); }
+
+.btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
+.btn-sm { font-size: 12px; padding: 7px 13px; }
+
+/* ── RULE CARDS ─────────────── */
+.rules-list { display: flex; flex-direction: column; gap: 10px; }
+
+.rule-card {
+  background: var(--s2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 16px 20px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 14px;
+  align-items: center;
+  transition: border-color 0.15s, background 0.15s;
+  animation: up 0.18s ease;
+}
+
+.rule-card:hover { border-color: var(--border2); background: var(--s3); }
+
+.rule-meta { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+
+.trigger-pill {
+  display: inline-block;
+  background: var(--p-soft);
+  border: 1px solid rgba(193,53,132,0.2);
+  border-radius: 5px;
+  padding: 2px 10px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: #e87ab0;
+}
+
+.rule-dm {
+  font-size: 12px; color: var(--t2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 460px; font-family: var(--mono);
+}
+
+.rule-reply-preview {
+  font-size: 11px; color: var(--success); opacity: 0.8;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 460px; font-family: var(--mono);
+}
+
+.rule-id-tag { font-family: var(--mono); font-size: 10px; color: var(--t3); margin-top: 2px; }
+.rule-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+
+/* ── FILTER ─────────────────── */
+.filter-bar { display: flex; gap: 10px; margin-bottom: 18px; }
+
+.filter-bar input {
+  flex: 1;
+  background: var(--s1); border: 1px solid var(--border);
+  color: var(--text); font-family: var(--mono); font-size: 12px;
+  padding: 10px 14px; border-radius: var(--r2); outline: none;
+  transition: border-color 0.15s;
+}
+
+.filter-bar input:focus { border-color: var(--ig2); }
+.filter-bar input::placeholder { color: var(--t3); }
+
+/* ── BADGE ──────────────────── */
+.badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: rgba(77,217,172,0.08); color: var(--success);
+  border: 1px solid rgba(77,217,172,0.18); border-radius: 100px;
+  padding: 2px 10px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.5px;
+}
+
+.badge::before { content: ''; width: 4px; height: 4px; border-radius: 50%; background: var(--success); }
+
+/* ── TOAST ──────────────────── */
+.toast-container { position: fixed; bottom: 24px; right: 24px; display: flex; flex-direction: column; gap: 8px; z-index: 9999; }
+
+.toast {
+  background: var(--s2); border: 1px solid var(--border2); border-radius: 10px;
+  padding: 12px 18px; font-size: 13px; font-family: var(--mono);
+  display: flex; align-items: center; gap: 10px; min-width: 240px;
+  animation: toastIn 0.28s cubic-bezier(0.34,1.56,0.64,1);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+}
+
+@keyframes toastIn {
+  from { opacity:0; transform:translateX(14px) scale(0.96); }
+  to   { opacity:1; transform:translateX(0) scale(1); }
+}
+
+.toast.success { border-left: 2px solid var(--success); }
+.toast.error   { border-left: 2px solid var(--error); }
+.toast.success .ti { color: var(--success); }
+.toast.error   .ti { color: var(--error); }
+
+/* ── EMPTY / LOADING ────────── */
+.empty { text-align: center; padding: 52px 20px; color: var(--t3); }
+.empty-icon { font-size: 22px; margin-bottom: 10px; opacity: 0.3; }
+.empty-text { font-size: 12px; font-family: var(--mono); }
+
+.loading { display: flex; align-items: center; gap: 10px; color: var(--t3); font-size: 12px; font-family: var(--mono); padding: 24px 0; }
+
+.spinner {
+  width: 13px; height: 13px;
+  border: 1.5px solid var(--s3); border-top-color: var(--ig3);
+  border-radius: 50%; animation: spin 0.65s linear infinite; flex-shrink: 0;
+}
+
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* ── MODAL ──────────────────── */
+.modal-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.72); backdrop-filter: blur(6px);
+  z-index: 200; align-items: center; justify-content: center;
+}
+
+.modal-overlay.open { display: flex; }
+
+.modal {
+  background: var(--s1); border: 1px solid var(--border2);
+  border-radius: 16px; padding: 28px 30px; width: 440px;
+  animation: modalIn 0.22s cubic-bezier(0.34,1.56,0.64,1);
+  box-shadow: 0 32px 80px rgba(0,0,0,0.6);
+}
+
+@keyframes modalIn {
+  from { opacity:0; transform:scale(0.94) translateY(8px); }
+  to   { opacity:1; transform:scale(1) translateY(0); }
+}
+
+.modal-title { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 22px; color: var(--text); }
+
+.modal-actions {
+  display: flex; gap: 10px; justify-content: flex-end;
+  margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border);
+}
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--s3); border-radius: 4px; }
 </style>
 </head>
 <body>
 
 <div class="shell">
+
   <aside class="sidebar">
-    <div class="logo">
-      <div class="logo-dot"></div>
-      inbot
+    <div class="logo-wrap">
+      <div class="logo">
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="ig" x1="0" y1="32" x2="32" y2="0" gradientUnits="userSpaceOnUse">
+              <stop offset="0%"   stop-color="#f77737"/>
+              <stop offset="40%"  stop-color="#e1306c"/>
+              <stop offset="75%"  stop-color="#c13584"/>
+              <stop offset="100%" stop-color="#833ab4"/>
+            </linearGradient>
+          </defs>
+          <rect width="32" height="32" rx="9" fill="url(#ig)"/>
+          <rect x="7" y="10" width="18" height="13" rx="3" fill="none" stroke="white" stroke-width="1.6"/>
+          <circle cx="16" cy="16.5" r="3.5" fill="none" stroke="white" stroke-width="1.6"/>
+          <circle cx="16" cy="16.5" r="1.2" fill="white"/>
+          <rect x="13" y="8" width="6" height="3" rx="1.5" fill="white"/>
+          <circle cx="22" cy="12.5" r="1" fill="white" opacity="0.8"/>
+        </svg>
+        inbot
+      </div>
     </div>
 
     <nav class="nav">
       <div class="nav-item active" data-page="dashboard">
-        <span class="nav-icon">◈</span> Dashboard
+        <span class="nav-dot"></span> Dashboard
       </div>
       <div class="nav-item" data-page="rules">
-        <span class="nav-icon">◎</span> Rules
+        <span class="nav-dot"></span> All Rules
       </div>
       <div class="nav-item" data-page="create">
-        <span class="nav-icon">+</span> New Rule
+        <span class="nav-dot"></span> New Rule
       </div>
     </nav>
-
-
   </aside>
 
   <main class="main">
 
-    <!-- Dashboard -->
+    <!-- DASHBOARD -->
     <div class="page active" id="page-dashboard">
       <div class="page-header">
-        <div class="page-title">comment <span>automation</span></div>
-        <div class="page-sub">monitor and manage your Instagram DM triggers</div>
+        <div class="chip"><span class="pip"></span> live</div>
+        <div class="page-title">Comments in.<br><span class="hl">DMs out.</span></div>
       </div>
 
       <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-value" id="stat-rules">—</div>
-          <div class="stat-label">Active Rules</div>
+        <div class="stat">
+          <div class="stat-num" id="stat-rules">—</div>
+          <div class="stat-label">active rules</div>
         </div>
-        <div class="stat-card">
-          <div class="stat-value" id="stat-videos">—</div>
-          <div class="stat-label">Videos Tracked</div>
+        <div class="stat">
+          <div class="stat-num" id="stat-videos">—</div>
+          <div class="stat-label">posts tracked</div>
         </div>
-        <div class="stat-card">
-          <div class="stat-value" id="stat-phrases">—</div>
-          <div class="stat-label">Catchphrases</div>
+        <div class="stat">
+          <div class="stat-num" id="stat-phrases">—</div>
+          <div class="stat-label">catchphrases</div>
         </div>
       </div>
 
       <div class="card">
-        <div class="card-title">Recent Rules</div>
+        <div class="card-head"><span class="card-head-dot"></span> recent rules</div>
         <div id="dashboard-rules-list">
-          <div class="loading"><div class="spinner"></div> loading rules...</div>
+          <div class="loading"><div class="spinner"></div> fetching rules…</div>
         </div>
       </div>
     </div>
 
-    <!-- Rules -->
+    <!-- RULES -->
     <div class="page" id="page-rules">
       <div class="page-header">
-        <div class="page-title">all <span>rules</span></div>
-        <div class="page-sub">manage your comment → DM automation rules</div>
+        <div class="page-title">All <span class="hl">rules</span></div>
       </div>
 
       <div class="filter-bar">
-        <input type="text" id="rules-filter" placeholder="filter by catchphrase or media id..." />
-        <button class="btn btn-primary" onclick="loadRules()">↺ refresh</button>
+        <input type="text" id="rules-filter" placeholder="filter by catchphrase or post id…" />
+        <button class="btn btn-ghost" onclick="loadRules()">↺ refresh</button>
       </div>
 
       <div id="rules-list">
-        <div class="loading"><div class="spinner"></div> loading...</div>
+        <div class="loading"><div class="spinner"></div> loading…</div>
       </div>
     </div>
 
-    <!-- Create -->
+    <!-- CREATE -->
     <div class="page" id="page-create">
       <div class="page-header">
-        <div class="page-title">new <span>rule</span></div>
-        <div class="page-sub">set a catchphrase that triggers an auto-DM on a post</div>
+        <div class="page-title">New <span class="hl">rule</span></div>
       </div>
 
       <div class="card">
-        <div class="card-title">Rule Details</div>
+        <div class="card-head"><span class="card-head-dot"></span> rule details</div>
         <div class="form-grid">
           <div class="field">
             <label>Instagram Post URL</label>
@@ -628,19 +594,20 @@
           </div>
           <div class="field">
             <label>Catchphrase</label>
-            <input type="text" id="create-catchphrase" placeholder="e.g. link, info, price" />
+            <input type="text" id="create-catchphrase" placeholder="e.g. link, guide, price, join" />
+            <span class="field-hint">when someone comments this word, the DM sends automatically</span>
           </div>
           <div class="field">
             <label>DM Message</label>
-            <textarea id="create-dm-message" rows="4" placeholder="The message to send when someone comments the catchphrase..."></textarea>
+            <textarea id="create-dm-message" rows="4" placeholder="Hey! Here's the link you asked for…"></textarea>
           </div>
           <div class="field">
-            <label>Comment Reply <span style="color:var(--muted);font-size:10px;text-transform:none;letter-spacing:0">(optional — e.g. "check your DMs!")</span></label>
-            <textarea id="create-reply-message" rows="2" placeholder="Leave blank to skip public reply..."></textarea>
+            <label>Comment Reply <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:10px;color:var(--t3)">(optional)</span></label>
+            <textarea id="create-reply-message" rows="2" placeholder="e.g. Sent you a DM! — leave blank to skip"></textarea>
           </div>
           <div>
             <button class="btn btn-primary" id="create-btn" onclick="createRule()">
-              <span>create rule</span>
+              <span>Create Rule</span>
             </button>
           </div>
         </div>
@@ -653,241 +620,178 @@
 <!-- Edit Modal -->
 <div class="modal-overlay" id="edit-modal">
   <div class="modal">
-    <div class="modal-title">edit rule</div>
+    <div class="modal-title">Edit Rule</div>
     <input type="hidden" id="edit-rule-id" />
     <div class="form-grid">
       <div class="field">
         <label>Catchphrase</label>
-        <input type="text" id="edit-catchphrase" placeholder="catchphrase" />
+        <input type="text" id="edit-catchphrase" />
       </div>
       <div class="field">
         <label>DM Message</label>
         <textarea id="edit-dm-message" rows="4"></textarea>
       </div>
       <div class="field">
-        <label>Comment Reply <span style="color:var(--muted);font-size:10px;text-transform:none;letter-spacing:0">(optional)</span></label>
-        <textarea id="edit-reply-message" rows="2" placeholder="Leave blank to skip public reply..."></textarea>
+        <label>Comment Reply <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:10px;color:var(--t3)">(optional)</span></label>
+        <textarea id="edit-reply-message" rows="2" placeholder="Leave blank to skip…"></textarea>
       </div>
     </div>
     <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="closeModal()">cancel</button>
-      <button class="btn btn-primary" onclick="saveEdit()">save changes</button>
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEdit()">Save Changes</button>
     </div>
   </div>
 </div>
 
-<!-- Toasts -->
 <div class="toast-container" id="toasts"></div>
 
 <script>
-  const getBase = () => window.location.origin;
+const getBase = () => window.location.origin;
 
-  // nav
-  document.querySelectorAll('.nav-item').forEach(item => {
-    item.addEventListener('click', () => {
-      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-      item.classList.add('active');
-      document.getElementById('page-' + item.dataset.page).classList.add('active');
-      if (item.dataset.page === 'rules') loadRules();
-      if (item.dataset.page === 'dashboard') loadDashboard();
-    });
+document.querySelectorAll('.nav-item').forEach(item => {
+  item.addEventListener('click', () => {
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    item.classList.add('active');
+    document.getElementById('page-' + item.dataset.page).classList.add('active');
+    if (item.dataset.page === 'rules') loadRules();
+    if (item.dataset.page === 'dashboard') loadDashboard();
   });
+});
 
-  // toast
-  function toast(msg, type = 'success') {
-    const el = document.createElement('div');
-    el.className = `toast ${type}`;
-    el.innerHTML = `<span class="toast-icon">${type === 'success' ? '✓' : '✗'}</span> ${msg}`;
-    document.getElementById('toasts').appendChild(el);
-    setTimeout(() => el.remove(), 3500);
+function toast(msg, type = 'success') {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `<span class="ti">${type === 'success' ? '✓' : '✗'}</span>${msg}`;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+async function api(path, opts = {}) {
+  const res = await fetch(getBase() + path, { headers: {'Content-Type':'application/json'}, ...opts });
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || `HTTP ${res.status}`); }
+  return res.json();
+}
+
+async function loadRules() {
+  const c = document.getElementById('rules-list');
+  c.innerHTML = '<div class="loading"><div class="spinner"></div> loading…</div>';
+  try { renderRules(await api('/crud/'), c); }
+  catch(e) { c.innerHTML = `<div class="empty"><div class="empty-icon">⚠</div><div class="empty-text">${e.message}</div></div>`; }
+}
+
+function renderRules(rules, container) {
+  const f = document.getElementById('rules-filter')?.value?.toLowerCase() || '';
+  const list = f ? rules.filter(r => r.catchphrase.toLowerCase().includes(f) || r.media_id.includes(f)) : rules;
+  if (!list.length) {
+    container.innerHTML = '<div class="empty"><div class="empty-icon">◎</div><div class="empty-text">no rules found</div></div>';
+    return;
   }
+  container.innerHTML = '<div class="rules-list">' + list.map(r => `
+    <div class="rule-card">
+      <div class="rule-meta">
+        <span class="trigger-pill">${escH(r.catchphrase)}</span>
+        <div class="rule-dm">✉ ${escH(r.dm_message)}</div>
+        ${r.reply_message ? `<div class="rule-reply-preview">↩ ${escH(r.reply_message)}</div>` : ''}
+        <div class="rule-id-tag">post: ${escH(r.media_id)} · #${r.id}</div>
+      </div>
+      <div class="rule-actions">
+        <button class="btn btn-ghost btn-sm" onclick="openEdit(${r.id},'${escA(r.catchphrase)}','${escA(r.dm_message)}','${escA(r.reply_message||'')}')">edit</button>
+        <button class="btn btn-danger" onclick="deleteRule(${r.id})">delete</button>
+      </div>
+    </div>
+  `).join('') + '</div>';
+}
 
-  // api helper
-  async function api(path, options = {}) {
-    const base = getBase();
-    if (!base) { toast('Set API base URL in the sidebar first', 'error'); throw new Error('no base url'); }
-    const res = await fetch(base + path, {
-      headers: { 'Content-Type': 'application/json' },
-      ...options
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || `HTTP ${res.status}`);
-    }
-    return res.json();
-  }
+document.getElementById('rules-filter')?.addEventListener('input', async () => {
+  try { renderRules(await api('/crud/'), document.getElementById('rules-list')); } catch(e) {}
+});
 
-  // load rules
-  async function loadRules() {
-    const container = document.getElementById('rules-list');
-    container.innerHTML = '<div class="loading"><div class="spinner"></div> loading...</div>';
-    try {
-      const rules = await api('/crud/');
-      renderRules(rules, container);
-    } catch(e) {
-      container.innerHTML = `<div class="empty"><div class="empty-icon">⚠</div><div class="empty-text">${e.message}</div></div>`;
-    }
-  }
-
-  function renderRules(rules, container) {
-    const filter = document.getElementById('rules-filter')?.value?.toLowerCase() || '';
-    const filtered = filter ? rules.filter(r =>
-      r.catchphrase.includes(filter) || r.media_id.includes(filter)
-    ) : rules;
-
-    if (!filtered.length) {
-      container.innerHTML = '<div class="empty"><div class="empty-icon">◎</div><div class="empty-text">no rules found</div></div>';
+async function loadDashboard() {
+  ['stat-rules','stat-videos','stat-phrases'].forEach(id => document.getElementById(id).textContent = '...');
+  const c = document.getElementById('dashboard-rules-list');
+  try {
+    const rules = await api('/crud/');
+    document.getElementById('stat-rules').textContent = rules.filter(r => r.is_active !== false).length;
+    document.getElementById('stat-videos').textContent = new Set(rules.map(r => r.media_id)).size;
+    document.getElementById('stat-phrases').textContent = new Set(rules.map(r => r.catchphrase)).size;
+    const recent = rules.slice(-5).reverse();
+    if (!recent.length) {
+      c.innerHTML = '<div class="empty"><div class="empty-icon">◎</div><div class="empty-text">no rules yet — create your first one</div></div>';
       return;
     }
-    container.innerHTML = '<div class="rules-list">' + filtered.map(r => `
+    c.innerHTML = '<div class="rules-list">' + recent.map(r => `
       <div class="rule-card">
         <div class="rule-meta">
-          <div class="rule-catchphrase">${escHtml(r.catchphrase)}</div>
-          <div class="rule-message">✉ ${escHtml(r.dm_message)}</div>
-          ${r.reply_message ? `<div class="rule-reply">${escHtml(r.reply_message)}</div>` : ''}
-          <div class="rule-id">media_id: ${escHtml(r.media_id)} &nbsp;·&nbsp; id: ${r.id}</div>
+          <span class="trigger-pill">${escH(r.catchphrase)}</span>
+          <div class="rule-dm">✉ ${escH(r.dm_message)}</div>
         </div>
-        <div class="rule-actions">
-          <button class="btn btn-ghost" style="font-size:11px;padding:6px 12px" onclick="openEdit(${r.id}, '${escAttr(r.catchphrase)}', '${escAttr(r.dm_message)}', '${escAttr(r.reply_message || '')}')">edit</button>
-          <button class="btn btn-danger" onclick="deleteRule(${r.id})">delete</button>
-        </div>
+        <span class="badge">active</span>
       </div>
     `).join('') + '</div>';
+  } catch(e) {
+    c.innerHTML = `<div class="empty"><div class="empty-icon">⚠</div><div class="empty-text">${e.message}</div></div>`;
+    ['stat-rules','stat-videos','stat-phrases'].forEach(id => document.getElementById(id).textContent = '—');
   }
+}
 
-  // filter live
-  document.getElementById('rules-filter')?.addEventListener('input', async () => {
-    try {
-      const rules = await api('/crud/');
-      renderRules(rules, document.getElementById('rules-list'));
-    } catch(e) {}
-  });
+async function createRule() {
+  const btn = document.getElementById('create-btn');
+  const vl = document.getElementById('create-video-link').value.trim();
+  const cp = document.getElementById('create-catchphrase').value.trim();
+  const dm = document.getElementById('create-dm-message').value.trim();
+  const rp = document.getElementById('create-reply-message').value.trim();
+  if (!vl || !cp || !dm) { toast('Post URL, catchphrase and DM message required', 'error'); return; }
+  btn.disabled = true;
+  btn.querySelector('span').textContent = 'creating…';
+  try {
+    await api('/crud/', { method:'POST', body: JSON.stringify({video_link:vl, catchphrase:cp, dm_message:dm, reply_message:rp||null}) });
+    toast('Rule created');
+    ['create-video-link','create-catchphrase','create-dm-message','create-reply-message'].forEach(id => document.getElementById(id).value = '');
+  } catch(e) { toast(e.message, 'error'); }
+  finally { btn.disabled = false; btn.querySelector('span').textContent = 'Create Rule'; }
+}
 
-  // dashboard
-  async function loadDashboard() {
-    document.getElementById('stat-rules').textContent = '...';
-    document.getElementById('stat-videos').textContent = '...';
-    document.getElementById('stat-phrases').textContent = '...';
-    const container = document.getElementById('dashboard-rules-list');
+async function deleteRule(id) {
+  if (!confirm(`Delete rule #${id}?`)) return;
+  try { await api(`/crud/${id}`, {method:'DELETE'}); toast('Rule deleted'); loadRules(); }
+  catch(e) { toast(e.message, 'error'); }
+}
 
-    try {
-      const rules = await api('/crud/');
-      document.getElementById('stat-rules').textContent = rules.filter(r => r.is_active !== false).length;
-      document.getElementById('stat-videos').textContent = new Set(rules.map(r => r.media_id)).size;
-      document.getElementById('stat-phrases').textContent = new Set(rules.map(r => r.catchphrase)).size;
+function openEdit(id, cp, dm, rp) {
+  document.getElementById('edit-rule-id').value = id;
+  document.getElementById('edit-catchphrase').value = cp;
+  document.getElementById('edit-dm-message').value = dm;
+  document.getElementById('edit-reply-message').value = rp || '';
+  document.getElementById('edit-modal').classList.add('open');
+}
 
-      const recent = rules.slice(-5).reverse();
-      if (!recent.length) {
-        container.innerHTML = '<div class="empty"><div class="empty-icon">◎</div><div class="empty-text">no rules yet — create one</div></div>';
-        return;
-      }
-      container.innerHTML = '<div class="rules-list">' + recent.map(r => `
-        <div class="rule-card">
-          <div class="rule-meta">
-            <div class="rule-catchphrase">${escHtml(r.catchphrase)}</div>
-            <div class="rule-message">${escHtml(r.dm_message)}</div>
-          </div>
-          <span class="tag">active</span>
-        </div>
-      `).join('') + '</div>';
-    } catch(e) {
-      container.innerHTML = `<div class="empty"><div class="empty-icon">⚠</div><div class="empty-text">${e.message}</div></div>`;
-      document.getElementById('stat-rules').textContent = '—';
-      document.getElementById('stat-videos').textContent = '—';
-      document.getElementById('stat-phrases').textContent = '—';
-    }
-  }
+function closeModal() { document.getElementById('edit-modal').classList.remove('open'); }
 
-  // create
-  async function createRule() {
-    const btn = document.getElementById('create-btn');
-    const videoLink = document.getElementById('create-video-link').value.trim();
-    const catchphrase = document.getElementById('create-catchphrase').value.trim();
-    const dmMessage = document.getElementById('create-dm-message').value.trim();
-    const replyMessage = document.getElementById('create-reply-message').value.trim();
+document.getElementById('edit-modal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeModal();
+});
 
-    if (!videoLink || !catchphrase || !dmMessage) { toast('Video link, catchphrase and DM message are required', 'error'); return; }
+async function saveEdit() {
+  const id = document.getElementById('edit-rule-id').value;
+  const cp = document.getElementById('edit-catchphrase').value.trim();
+  const dm = document.getElementById('edit-dm-message').value.trim();
+  const rp = document.getElementById('edit-reply-message').value.trim();
+  if (!cp || !dm) { toast('Fields cannot be empty', 'error'); return; }
+  try {
+    await api(`/crud/${id}`, {method:'PUT', body:JSON.stringify({catchphrase:cp, dm_message:dm, reply_message:rp||null})});
+    toast('Rule updated'); closeModal(); loadRules();
+  } catch(e) { toast(e.message, 'error'); }
+}
 
-    btn.disabled = true;
-    btn.querySelector('span').textContent = 'creating...';
+function escH(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function escA(s) {
+  return String(s).replace(/'/g,"\\'").replace(/"/g,'\\"').replace(/\n/g,'\\n');
+}
 
-    try {
-      await api('/crud/', {
-        method: 'POST',
-        body: JSON.stringify({ video_link: videoLink, catchphrase, dm_message: dmMessage, reply_message: replyMessage || null })
-      });
-      toast('Rule created successfully');
-      document.getElementById('create-video-link').value = '';
-      document.getElementById('create-catchphrase').value = '';
-      document.getElementById('create-dm-message').value = '';
-      document.getElementById('create-reply-message').value = '';
-    } catch(e) {
-      toast(e.message, 'error');
-    } finally {
-      btn.disabled = false;
-      btn.querySelector('span').textContent = 'create rule';
-    }
-  }
-
-  // delete
-  async function deleteRule(id) {
-    if (!confirm(`Delete rule #${id}?`)) return;
-    try {
-      await api(`/crud/${id}`, { method: 'DELETE' });
-      toast('Rule deleted');
-      loadRules();
-    } catch(e) {
-      toast(e.message, 'error');
-    }
-  }
-
-  // edit modal
-  function openEdit(id, catchphrase, dmMessage, replyMessage) {
-    document.getElementById('edit-rule-id').value = id;
-    document.getElementById('edit-catchphrase').value = catchphrase;
-    document.getElementById('edit-dm-message').value = dmMessage;
-    document.getElementById('edit-reply-message').value = replyMessage || '';
-    document.getElementById('edit-modal').classList.add('open');
-  }
-
-  function closeModal() {
-    document.getElementById('edit-modal').classList.remove('open');
-  }
-
-  document.getElementById('edit-modal').addEventListener('click', e => {
-    if (e.target === e.currentTarget) closeModal();
-  });
-
-  async function saveEdit() {
-    const id = document.getElementById('edit-rule-id').value;
-    const catchphrase = document.getElementById('edit-catchphrase').value.trim();
-    const dmMessage = document.getElementById('edit-dm-message').value.trim();
-    const replyMessage = document.getElementById('edit-reply-message').value.trim();
-    if (!catchphrase || !dmMessage) { toast('Catchphrase and DM message cannot be empty', 'error'); return; }
-    try {
-      await api(`/crud/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify({ catchphrase, dm_message: dmMessage, reply_message: replyMessage || null })
-      });
-      toast('Rule updated');
-      closeModal();
-      loadRules();
-    } catch(e) {
-      toast(e.message, 'error');
-    }
-  }
-
-  // utils
-  function escHtml(s) {
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  }
-  function escAttr(s) {
-    return String(s).replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\n/g, '\\n');
-  }
-
-  // init
-  loadDashboard();
+loadDashboard();
 </script>
 </body>
 </html>
