@@ -7,7 +7,7 @@ from database import CommentDMRule, get_db
 from dotenv import load_dotenv
 from typing import Optional
 import os
-from datetime import datetime   # ← Fixed import
+from datetime import datetime
 
 load_dotenv()
 
@@ -27,41 +27,6 @@ async def get_httpx_client():
         yield client
 
 
-# ====================== MODELS ======================
-class RuleCreate(BaseModel):
-    video_link: str
-    catchphrase: str
-    dm_message: str
-    reply_message: Optional[str] = None
-
-
-class RuleUpdate(BaseModel):
-    catchphrase: str
-    dm_message: str
-    reply_message: Optional[str] = None
-
-
-class RuleResponse(BaseModel):
-    id: int
-    media_id: str
-    catchphrase: str
-    dm_message: str
-    reply_message: Optional[str] = None
-    is_active: bool
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
-# ====================== UTILS ======================
-def extract_shortcode(url: str) -> str:
-    url = url.split("?")[0].rstrip("/")
-    parts = [p for p in url.split("/") if p]
-    return parts[-1] if parts else ""
-
-
-# This version can be called directly OR used as dependency
 async def get_media_id(
     video_link: str, 
     client: AsyncClient = Depends(get_httpx_client)
@@ -102,13 +67,45 @@ async def get_media_id(
 
     raise HTTPException(404, "Video not found in your Instagram account")
 
+# ====================== MODELS ======================
+class RuleCreate(BaseModel):
+    video_link: str
+    catchphrase: str
+    dm_message: str
+    reply_message: Optional[str] = None
+
+
+class RuleUpdate(BaseModel):
+    catchphrase: str
+    dm_message: str
+    reply_message: Optional[str] = None
+
+
+class RuleResponse(BaseModel):
+    id: int
+    media_id: str
+    catchphrase: str
+    dm_message: str
+    reply_message: Optional[str] = None
+    is_active: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ====================== UTILS ======================
+def extract_shortcode(url: str) -> str:
+    url = url.split("?")[0].rstrip("/")
+    parts = [p for p in url.split("/") if p]
+    return parts[-1] if parts else ""
 
 # ====================== ROUTES ======================
 @router.post("/")
 async def create_rule(
     rule: RuleCreate, 
     db: AsyncSession = Depends(get_db),
-    media_id: str = Depends(get_media_id)        # ← Best way
+    media_id: str = Depends(get_media_id)
 ):
     new_rule = CommentDMRule(
         media_id=media_id,
@@ -140,7 +137,7 @@ async def get_all_rules(db: AsyncSession = Depends(get_db)):
 async def get_rules_by_video(
     video_link: str = Query(...),
     db: AsyncSession = Depends(get_db),
-    media_id: str = Depends(get_media_id)        # ← Using dependency
+    media_id: str = Depends(get_media_id)
 ):
     result = await db.execute(
         select(CommentDMRule).where(CommentDMRule.media_id == media_id)
