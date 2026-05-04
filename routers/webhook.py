@@ -19,7 +19,6 @@ IG_USER_ID = os.getenv('IG_USER_ID')
 if not all([VERIFY_TOKEN, PAGE_ACCESS_TOKEN, IG_USER_ID]):
     raise RuntimeError("Missing required environment variables: VERIFY_TOKEN, PAGE_ACCESS_TOKEN, or IG_USER_ID")
 
-
 @router.get("/")
 async def verify_webhook(request: Request):
     params = dict(request.query_params)
@@ -31,7 +30,6 @@ async def verify_webhook(request: Request):
         return PlainTextResponse(content=challenge)
 
     raise HTTPException(403, "Verification failed")
-
 
 @router.post("/")
 async def receive_webhook(request: Request, db : AsyncSession = Depends(get_db)):

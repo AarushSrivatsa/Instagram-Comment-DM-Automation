@@ -16,7 +16,7 @@ def privacy():
     <p>This application uses the Instagram Graph API to access Instagram account data
     with user permission.</p>
     <p>Data is used only for application functionality. We do not sell or share user data.</p>
-    <p>Users may request deletion of their data by contacting: your@email.com</p>
+    <p>Users may request deletion of their data by contacting: pitlaaarushsrivatsa@gmail.com</p>
     """
 
 @app.get("/")
