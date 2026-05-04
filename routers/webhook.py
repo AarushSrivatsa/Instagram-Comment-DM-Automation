@@ -97,7 +97,7 @@ async def get_rule(db: AsyncSession, media_id: str, comment_text: str):
 
 async def process_comment(
     db: AsyncSession, 
-    rule, 
+    rule: CommentDMRule,
     comment_id: str, 
     media_id: str, 
     user_id: str, 
