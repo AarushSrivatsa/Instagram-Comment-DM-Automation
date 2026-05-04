@@ -1,8 +1,9 @@
 import httpx
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Depends, Request, HTTPException
 from fastapi.responses import PlainTextResponse
 from sqlalchemy import select
-from database import AsyncSessionLocal, CommentDMRule, DMLog
+from sqlalchemy.ext.asyncio import AsyncSession
+from database import AsyncSessionLocal, CommentDMRule, DMLog, get_db
 from dotenv import load_dotenv
 import os
 
@@ -33,7 +34,7 @@ async def verify_webhook(request: Request):
 
 
 @router.post("/")
-async def receive_webhook(request: Request):
+async def receive_webhook(request: Request, db : AsyncSession = Depends(get_db)):
     data = await request.json()
     print("Webhook payload received:", data)
 
@@ -58,44 +59,43 @@ async def receive_webhook(request: Request):
                 if not all([comment_text, media_id, comment_id, user_id]):
                     continue
 
-                async with AsyncSessionLocal() as db:
                     # Prevent sending DM multiple times for same comment
-                    existing_log = await db.execute(
-                        select(DMLog).where(DMLog.comment_id == comment_id)
-                    )
-                    if existing_log.scalar_one_or_none():
-                        print("Duplicate comment skipped")
-                        continue
+                existing_log = await db.execute(
+                    select(DMLog).where(DMLog.comment_id == comment_id)
+                )
+                if existing_log.scalar_one_or_none():
+                    print("Duplicate comment skipped")
+                    continue
 
                     # Find matching rule
-                    rule_result = await db.execute(
-                        select(CommentDMRule).where(
-                            CommentDMRule.media_id == media_id,
-                            CommentDMRule.catchphrase == comment_text,
-                            CommentDMRule.is_active == True
-                        )
+                rule_result = await db.execute(
+                    select(CommentDMRule).where(
+                        CommentDMRule.media_id == media_id,
+                        CommentDMRule.catchphrase == comment_text,
+                        CommentDMRule.is_active == True
                     )
-                    rule = rule_result.scalar_one_or_none()
+                )
+                rule = rule_result.scalar_one_or_none()
 
-                    if not rule:
-                        print(f"No active rule found for media_id={media_id}, catchphrase='{comment_text}'")
-                        continue
+                if not rule:
+                    print(f"No active rule found for media_id={media_id}, catchphrase='{comment_text}'")
+                    continue
 
                     # Send DM using graph.instagram.com
-                    await send_dm(comment_id, rule.dm_message)
+                await send_dm(comment_id, rule.dm_message)
 
                     # Send public reply if configured
-                    if rule.reply_message:
-                        await send_reply(comment_id, rule.reply_message)
+                if rule.reply_message:
+                    await send_reply(comment_id, rule.reply_message)
 
                     # Log the action
-                    new_log = DMLog(
-                        user_id=user_id,
-                        media_id=media_id,
-                        comment_id=comment_id
-                    )
-                    db.add(new_log)
-                    await db.commit()
+                new_log = DMLog(
+                    user_id=user_id,
+                    media_id=media_id,
+                    comment_id=comment_id
+                )
+                db.add(new_log)
+                await db.commit()
 
         return {"status": "ok"}
 

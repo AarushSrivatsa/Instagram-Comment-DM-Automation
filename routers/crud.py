@@ -1,8 +1,9 @@
 import httpx
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
 from pydantic import BaseModel
 from sqlalchemy import select
-from database import AsyncSessionLocal, CommentDMRule
+from sqlalchemy.ext.asyncio import AsyncSession
+from database import AsyncSessionLocal, CommentDMRule, get_db
 from dotenv import load_dotenv
 from typing import Optional
 import os
@@ -67,130 +68,118 @@ async def get_media_id(video_link: str) -> str:
     raise HTTPException(404, "Video not found in your Instagram account")
 
 @router.post("/")
-async def create_rule(rule: RuleCreate):
+async def create_rule(rule: RuleCreate, db : AsyncSession = Depends(get_db)):
 
     media_id = await get_media_id(rule.video_link)
 
-    async with AsyncSessionLocal() as db:
+    new_rule = CommentDMRule(
+        media_id=media_id,
+        catchphrase=rule.catchphrase.lower(),
+        dm_message=rule.dm_message,
+        reply_message=rule.reply_message or None,
+    )
 
-        new_rule = CommentDMRule(
-            media_id=media_id,
-            catchphrase=rule.catchphrase.lower(),
-            dm_message=rule.dm_message,
-            reply_message=rule.reply_message or None,
-        )
+    db.add(new_rule)
+    await db.commit()
+    await db.refresh(new_rule)
 
-        db.add(new_rule)
-        await db.commit()
-        await db.refresh(new_rule)
-
-        return {
-            "id": new_rule.id,
-            "video_link": rule.video_link,
-            "catchphrase": new_rule.catchphrase,
-            "dm_message": new_rule.dm_message,
-            "reply_message": new_rule.reply_message,
-        }
+    return {
+        "id": new_rule.id,
+        "video_link": rule.video_link,
+        "catchphrase": new_rule.catchphrase,
+        "dm_message": new_rule.dm_message,
+        "reply_message": new_rule.reply_message,
+    }
 
 @router.get("/")
-async def get_all_rules():
+async def get_all_rules(db : AsyncSession = Depends(get_db)):
+    result = await db.execute(select(CommentDMRule))
+    rules = result.scalars().all()
 
-    async with AsyncSessionLocal() as db:
-
-        result = await db.execute(select(CommentDMRule))
-
-        rules = result.scalars().all()
-
-        return [
-            {
-                "id": r.id,
-                "media_id": r.media_id,
-                "catchphrase": r.catchphrase,
-                "dm_message": r.dm_message,
-                "reply_message": r.reply_message,
-            }
-            for r in rules
-        ]
+    return [
+        {
+            "id": r.id,
+            "media_id": r.media_id,
+            "catchphrase": r.catchphrase,
+            "dm_message": r.dm_message,
+            "reply_message": r.reply_message,
+        }
+        for r in rules
+    ]
 
 @router.get("/video")
 async def get_rules_by_video(
-    video_link: str = Query(...)
+    video_link: str = Query(...),
+    db : AsyncSession = Depends(get_db)
 ):
 
     media_id = await get_media_id(video_link)
 
-    async with AsyncSessionLocal() as db:
-
-        result = await db.execute(
-            select(CommentDMRule).where(
-                CommentDMRule.media_id == media_id
-            )
+    result = await db.execute(
+        select(CommentDMRule).where(
+            CommentDMRule.media_id == media_id
         )
+    )
 
-        rules = result.scalars().all()
-
-        return [
-            {
-                "id": r.id,
-                "video_link": video_link,
-                "catchphrase": r.catchphrase,
-                "dm_message": r.dm_message,
-                "reply_message": r.reply_message,
-            }
-            for r in rules
-        ]
+    rules = result.scalars().all()
+    return [
+        {
+            "id": r.id,
+            "video_link": video_link,
+            "catchphrase": r.catchphrase,
+            "dm_message": r.dm_message,
+            "reply_message": r.reply_message,
+        }
+        for r in rules
+    ]
 
 @router.put("/{rule_id}")
-async def update_rule(rule_id: int, rule: RuleUpdate):
-
-    async with AsyncSessionLocal() as db:
-
-        result = await db.execute(
-            select(CommentDMRule).where(
-                CommentDMRule.id == rule_id
+async def update_rule(rule_id: int, rule: RuleUpdate, db : AsyncSession = Depends(get_db)):
+    
+    result = await db.execute(
+        select(CommentDMRule).where(
+            CommentDMRule.id == rule_id
             )
-        )
+            )
 
-        existing = result.scalar_one_or_none()
+    existing = result.scalar_one_or_none()
 
-        if not existing:
+    if not existing:
             raise HTTPException(404, "Rule not found")
 
-        existing.catchphrase = rule.catchphrase.lower()
-        existing.dm_message = rule.dm_message
-        existing.reply_message = rule.reply_message or None
+    existing.catchphrase = rule.catchphrase.lower()
+    existing.dm_message = rule.dm_message
+    existing.reply_message = rule.reply_message or None
 
-        await db.commit()
-        await db.refresh(existing)
+    await db.commit()
+    await db.refresh(existing)
 
-        return {
-            "id": existing.id,
-            "media_id": existing.media_id,
-            "catchphrase": existing.catchphrase,
-            "dm_message": existing.dm_message,
-            "reply_message": existing.reply_message,
-        }
+    return {
+        "id": existing.id,
+        "media_id": existing.media_id,
+        "catchphrase": existing.catchphrase,
+        "dm_message": existing.dm_message,
+        "reply_message": existing.reply_message,
+    }
 
 @router.delete("/{rule_id}")
-async def delete_rule(rule_id: int):
+async def delete_rule(rule_id: int, db : AsyncSession = Depends(get_db)):
 
-    async with AsyncSessionLocal() as db:
-
-        result = await db.execute(
-            select(CommentDMRule).where(
+    result = await db.execute(
+        select(CommentDMRule).where(
                 CommentDMRule.id == rule_id
             )
         )
 
-        existing = result.scalar_one_or_none()
+    existing = result.scalar_one_or_none()
 
-        if not existing:
-            raise HTTPException(404, "Rule not found")
+    if not existing:
+        raise HTTPException(404, "Rule not found")
 
-        await db.delete(existing)
-        await db.commit()
+    await db.delete(existing)
+    await db.commit()
 
-        return {
+    return {
             "status": "deleted",
             "rule_id": rule_id
         }
