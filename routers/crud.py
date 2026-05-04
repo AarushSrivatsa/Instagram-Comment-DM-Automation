@@ -1,4 +1,4 @@
-import httpx
+from httpx import AsyncClient
 from fastapi import APIRouter, HTTPException, Query, Depends
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -35,7 +35,7 @@ def extract_shortcode(url: str) -> str:
     parts = [p for p in url.split("/") if p]
     return parts[-1] if parts else ""
 
-async def get_media_id(video_link: str) -> str:
+async def get_media_id(video_link: str, client: AsyncClient = AsyncClient()) -> str:
     shortcode = extract_shortcode(video_link)
     print(f"Looking for shortcode: '{shortcode}'")
 
@@ -46,7 +46,7 @@ async def get_media_id(video_link: str) -> str:
         "access_token": PAGE_ACCESS_TOKEN,
     }
 
-    async with httpx.AsyncClient() as client:
+    async with AsyncClient() as client:
         while url:
             response = await client.get(url, params=params)
 
