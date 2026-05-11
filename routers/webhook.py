@@ -125,7 +125,9 @@ async def process_comment(
 # ====================== SEND FUNCTIONS ======================
 
 async def send_dm(comment_id: str, message: str, client: AsyncClient):
-    url = f"https://graph.instagram.com/v25.0/{IG_USER_ID}/messages"
+    # Use graph.facebook.com for messaging (more reliable)
+    url = f"https://graph.facebook.com/v25.0/{IG_USER_ID}/messages"
+    
     payload = {
         "recipient": {"comment_id": comment_id},
         "message": {"text": message}
@@ -134,16 +136,15 @@ async def send_dm(comment_id: str, message: str, client: AsyncClient):
     response = await client.post(
         url, 
         json=payload, 
-        headers={"Authorization": f"Bearer {PAGE_ACCESS_TOKEN}"}
+        params={"access_token": PAGE_ACCESS_TOKEN}   # Better to send as query param
     )
 
     if response.status_code != 200:
-        print(f"DM Failed: {response.text}")
-        raise Exception(f"DM failed with status {response.status_code}")
+        print(f"❌ DM Failed: {response.status_code} - {response.text}")
+        raise Exception(f"DM failed: {response.text}")
     
-    print(f"✅ DM sent for comment {comment_id}")
-
-
+    print(f"✅ DM sent successfully for comment {comment_id}")
+    
 async def send_reply(comment_id: str, message: str, client: AsyncClient):
     url = f"https://graph.instagram.com/v25.0/{comment_id}/replies"
 

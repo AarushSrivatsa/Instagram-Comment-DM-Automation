@@ -58,57 +58,56 @@ def extract_shortcode(url: str) -> str:
     url = url.split("?")[0].rstrip("/")
     parts = [p for p in url.split("/") if p]
     return parts[-1] if parts else ""
-
 async def get_media_id(
-    rule: RuleCreate,                    # ← Take the whole model
+    rule: RuleCreate, 
     client: AsyncClient = Depends(get_httpx_client)
 ) -> str:
     
-    video_link = rule.video_link         # ← Extract from model
+    video_link = rule.video_link
     shortcode = extract_shortcode(video_link)
     
     if not shortcode:
         raise HTTPException(400, "Invalid Instagram URL")
 
-    print(f"🔍 Extracted shortcode: '{shortcode}'")
-    print(f"🔑 IG_USER_ID: {IG_USER_ID}")
-    print(f"🔑 Token length: {len(PAGE_ACCESS_TOKEN) if PAGE_ACCESS_TOKEN else 0}")
+    print(f"🔍 Shortcode: {shortcode}")
+    print(f"🔑 IG_USER_ID: {IG_USER_ID} (type: {type(IG_USER_ID)})")
 
-    url = f"https://graph.instagram.com/v25.0/{IG_USER_ID}/media"
-    params = {
-        "fields": "id,permalink,shortcode",
-        "limit": 100,
-        "access_token": PAGE_ACCESS_TOKEN,
-    }
+    # Try both endpoints
+    endpoints = [
+        f"https://graph.facebook.com/v25.0/{IG_USER_ID}/media",
+        f"https://graph.instagram.com/v25.0/{IG_USER_ID}/media"
+    ]
 
-    page = 1
-    while url:
-        print(f"📡 Fetching page {page}...")
-        response = await client.get(url, params=params)
+    for base_url in endpoints:
+        print(f"📡 Trying: {base_url}")
+        url = base_url
+        params = {
+            "fields": "id,shortcode,permalink,media_type",
+            "limit": 100,
+            "access_token": PAGE_ACCESS_TOKEN,
+        }
 
-        print(f"📊 Status: {response.status_code}")
+        page = 1
+        while url:
+            response = await client.get(url, params=params)
+            print(f"   Status: {response.status_code} | Page {page}")
 
-        if response.status_code != 200:
-            print(f"❌ API Error: {response.text}")
-            raise HTTPException(400, f"Instagram API error: {response.text}")
+            if response.status_code == 200:
+                data = response.json()
+                for media in data.get("data", []):
+                    api_shortcode = media.get("shortcode") or extract_shortcode(media.get("permalink", ""))
+                    if api_shortcode == shortcode:
+                        print(f"✅ MEDIA FOUND! ID: {media['id']}")
+                        return media["id"]
 
-        data = response.json()
-        print(f"✅ Found {len(data.get('data', []))} media items")
+                url = data.get("paging", {}).get("next")
+                params = {}
+                page += 1
+            else:
+                print(f"   Failed: {response.text[:400]}")
+                break
 
-        for media in data.get("data", []):
-            api_shortcode = media.get("shortcode") or extract_shortcode(media.get("permalink", ""))
-            
-            if api_shortcode == shortcode:
-                print(f"✅ MATCH! Media ID: {media['id']}")
-                return media["id"]
-
-        url = data.get("paging", {}).get("next")
-        params = {}
-        page += 1
-
-    print("❌ Video not found in account")
-    raise HTTPException(404, "Video not found in your Instagram account")
-
+    raise HTTPException(404, "Video not found. Make sure the reel is from this Business Account.")
 
 # ====================== ROUTES ======================
 @router.post("/")
@@ -191,3 +190,10 @@ async def delete_rule(rule_id: int, db: AsyncSession = Depends(get_db)):
     await db.commit()
 
     return {"status": "deleted", "rule_id": rule_id}
+
+@router.get("/debug-id")
+async def debug_id(client: AsyncClient = Depends(get_httpx_client)):
+    url = f"https://graph.facebook.com/v25.0/{IG_USER_ID}?fields=id,username,name,account_type"
+    resp = await client.get(url, params={"access_token": PAGE_ACCESS_TOKEN})
+    print("DEBUG ACCOUNT:", resp.text)
+    return resp.json()
