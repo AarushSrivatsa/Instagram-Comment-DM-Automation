@@ -20,6 +20,19 @@ PAGE_ACCESS_TOKEN = os.getenv("PAGE_ACCESS_TOKEN")
 IG_USER_ID = os.getenv("IG_USER_ID")
 
 
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+
+@router.exception_handler(RequestValidationError)
+async def validation_exception_handler(request, exc: RequestValidationError):
+    print("=== 422 VALIDATION ERROR ===")
+    print("Request body:", exc.body)
+    print("Errors:", exc.errors())
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors(), "body": exc.body},
+    )
+
 # ====================== DEPENDENCIES ======================
 async def get_httpx_client():
     """Dependency that provides httpx AsyncClient"""
