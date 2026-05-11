@@ -26,6 +26,39 @@ async def get_httpx_client():
     async with AsyncClient(timeout=20.0) as client:
         yield client
 
+# ====================== MODELS ======================
+class RuleCreate(BaseModel):
+    video_link: str
+    catchphrase: str
+    dm_message: str
+    reply_message: Optional[str] = None
+
+
+class RuleUpdate(BaseModel):
+    catchphrase: str
+    dm_message: str
+    reply_message: Optional[str] = None
+
+
+class RuleResponse(BaseModel):
+    id: int
+    media_id: str
+    catchphrase: str
+    dm_message: str
+    reply_message: Optional[str] = None
+    is_active: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ====================== UTILS ======================
+def extract_shortcode(url: str) -> str:
+    url = url.split("?")[0].rstrip("/")
+    parts = [p for p in url.split("/") if p]
+    return parts[-1] if parts else ""
+
 async def get_media_id(
     rule: RuleCreate,                    # ← Take the whole model
     client: AsyncClient = Depends(get_httpx_client)
@@ -76,38 +109,6 @@ async def get_media_id(
     print("❌ Video not found in account")
     raise HTTPException(404, "Video not found in your Instagram account")
 
-# ====================== MODELS ======================
-class RuleCreate(BaseModel):
-    video_link: str
-    catchphrase: str
-    dm_message: str
-    reply_message: Optional[str] = None
-
-
-class RuleUpdate(BaseModel):
-    catchphrase: str
-    dm_message: str
-    reply_message: Optional[str] = None
-
-
-class RuleResponse(BaseModel):
-    id: int
-    media_id: str
-    catchphrase: str
-    dm_message: str
-    reply_message: Optional[str] = None
-    is_active: bool
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
-# ====================== UTILS ======================
-def extract_shortcode(url: str) -> str:
-    url = url.split("?")[0].rstrip("/")
-    parts = [p for p in url.split("/") if p]
-    return parts[-1] if parts else ""
 
 # ====================== ROUTES ======================
 @router.post("/")
