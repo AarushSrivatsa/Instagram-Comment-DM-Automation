@@ -20,19 +20,6 @@ PAGE_ACCESS_TOKEN = os.getenv("PAGE_ACCESS_TOKEN")
 IG_USER_ID = os.getenv("IG_USER_ID")
 
 
-from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
-
-@router.exception_handler(RequestValidationError)
-async def validation_exception_handler(request, exc: RequestValidationError):
-    print("=== 422 VALIDATION ERROR ===")
-    print("Request body:", exc.body)
-    print("Errors:", exc.errors())
-    return JSONResponse(
-        status_code=422,
-        content={"detail": exc.errors(), "body": exc.body},
-    )
-
 # ====================== DEPENDENCIES ======================
 async def get_httpx_client():
     """Dependency that provides httpx AsyncClient"""
@@ -120,25 +107,28 @@ async def create_rule(
     db: AsyncSession = Depends(get_db),
     media_id: str = Depends(get_media_id)
 ):
-    new_rule = CommentDMRule(
-        media_id=media_id,
-        catchphrase=rule.catchphrase.lower().strip(),
-        dm_message=rule.dm_message,
-        reply_message=rule.reply_message,
-    )
+    print("=== CREATE RULE CALLED SUCCESSFULLY ===")
+    print(f"Rule data received: {rule.model_dump()}")
+    print(f"Media ID from dependency: {media_id}")
 
-    db.add(new_rule)
-    await db.commit()
-    await db.refresh(new_rule)
+    try:
+        new_rule = CommentDMRule(
+            media_id=media_id,
+            catchphrase=rule.catchphrase.lower().strip(),
+            dm_message=rule.dm_message,
+            reply_message=rule.reply_message,
+        )
 
-    return {
-        "id": new_rule.id,
-        "video_link": rule.video_link,
-        "catchphrase": new_rule.catchphrase,
-        "dm_message": new_rule.dm_message,
-        "reply_message": new_rule.reply_message,
-    }
+        db.add(new_rule)
+        await db.commit()
+        await db.refresh(new_rule)
 
+        print(f"✅ Rule created with ID: {new_rule.id}")
+        return new_rule
+
+    except Exception as e:
+        print(f"❌ Error inside create_rule: {e}")
+        raise
 
 @router.get("/", response_model=list[RuleResponse])
 async def get_all_rules(db: AsyncSession = Depends(get_db)):
