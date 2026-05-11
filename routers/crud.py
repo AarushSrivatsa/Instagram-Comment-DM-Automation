@@ -190,10 +190,3 @@ async def delete_rule(rule_id: int, db: AsyncSession = Depends(get_db)):
     await db.commit()
 
     return {"status": "deleted", "rule_id": rule_id}
-
-@router.get("/debug-id")
-async def debug_id(client: AsyncClient = Depends(get_httpx_client)):
-    url = f"https://graph.facebook.com/v25.0/{IG_USER_ID}?fields=id,username,name,account_type"
-    resp = await client.get(url, params={"access_token": PAGE_ACCESS_TOKEN})
-    print("DEBUG ACCOUNT:", resp.text)
-    return resp.json()
