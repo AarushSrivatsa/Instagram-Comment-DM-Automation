@@ -126,7 +126,7 @@ async def process_comment(
 
 async def send_dm(comment_id: str, message: str, client: AsyncClient):
     # Use graph.facebook.com for messaging (more reliable)
-    url = f"https://graph.facebook.com/v25.0/{IG_USER_ID}/messages"
+    url = f"https://graph.instagram.com/v25.0/{IG_USER_ID}/messages"
     
     payload = {
         "recipient": {"comment_id": comment_id},
