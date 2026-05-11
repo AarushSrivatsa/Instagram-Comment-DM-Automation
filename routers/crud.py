@@ -26,17 +26,20 @@ async def get_httpx_client():
     async with AsyncClient(timeout=20.0) as client:
         yield client
 
-
 async def get_media_id(
-    video_link: str, 
+    rule: RuleCreate,                    # ← Take the whole model
     client: AsyncClient = Depends(get_httpx_client)
 ) -> str:
     
+    video_link = rule.video_link         # ← Extract from model
     shortcode = extract_shortcode(video_link)
+    
     if not shortcode:
         raise HTTPException(400, "Invalid Instagram URL")
 
-    print(f"🔍 Looking for shortcode: '{shortcode}'")
+    print(f"🔍 Extracted shortcode: '{shortcode}'")
+    print(f"🔑 IG_USER_ID: {IG_USER_ID}")
+    print(f"🔑 Token length: {len(PAGE_ACCESS_TOKEN) if PAGE_ACCESS_TOKEN else 0}")
 
     url = f"https://graph.instagram.com/v25.0/{IG_USER_ID}/media"
     params = {
@@ -45,26 +48,32 @@ async def get_media_id(
         "access_token": PAGE_ACCESS_TOKEN,
     }
 
+    page = 1
     while url:
+        print(f"📡 Fetching page {page}...")
         response = await client.get(url, params=params)
 
+        print(f"📊 Status: {response.status_code}")
+
         if response.status_code != 200:
-            print(f"Instagram API error {response.status_code}: {response.text}")
+            print(f"❌ API Error: {response.text}")
             raise HTTPException(400, f"Instagram API error: {response.text}")
 
         data = response.json()
+        print(f"✅ Found {len(data.get('data', []))} media items")
 
         for media in data.get("data", []):
             api_shortcode = media.get("shortcode") or extract_shortcode(media.get("permalink", ""))
-            print(f"Comparing: '{api_shortcode}' == '{shortcode}'")
             
             if api_shortcode == shortcode:
-                print(f"✅ Media found! ID: {media['id']}")
+                print(f"✅ MATCH! Media ID: {media['id']}")
                 return media["id"]
 
         url = data.get("paging", {}).get("next")
         params = {}
+        page += 1
 
+    print("❌ Video not found in account")
     raise HTTPException(404, "Video not found in your Instagram account")
 
 # ====================== MODELS ======================
